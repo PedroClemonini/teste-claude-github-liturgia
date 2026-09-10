@@ -1,0 +1,101 @@
+/**
+ * Acervo de músicas e cifras.
+ *
+ * A cifra é guardada em ChordPro (fonte única da verdade) e, junto dela, uma
+ * cópia da letra sem acordes: é essa cópia que permite buscar a música por um
+ * trecho cantado, sem que os colchetes atrapalhem o casamento do texto.
+ */
+import { prisma } from '@/lib/prisma.js';
+import { songSchema } from '@/domain/validation/schemas.js';
+import { ACTIONS, assertCan } from '@/domain/auth/roles.js';
+import { extractPlainLyrics } from '@/domain/chordpro/parse.js';
+import { ConflictError, NotFoundError, unwrap } from '@/domain/errors.js';
+
+const MAX_RESULTS = 200;
+
+function toRow(data) {
+  return {
+    title: data.title,
+    composer: data.composer ?? null,
+    chordPro: data.chordPro,
+    originalKey: data.originalKey,
+    moments: data.moments,
+    seasons: data.seasons,
+    plainLyrics: extractPlainLyrics(data.chordPro),
+  };
+}
+
+/** @param {object} input @param {{id: string, role: string}} actor */
+export async function createSong(input, actor) {
+  assertCan(actor, ACTIONS.MANAGE_SONG);
+  const data = unwrap(songSchema.safeParse(input));
+  return prisma.song.create({ data: { ...toRow(data), createdById: actor.id } });
+}
+
+export async function updateSong(id, input, actor) {
+  assertCan(actor, ACTIONS.MANAGE_SONG);
+  const data = unwrap(songSchema.safeParse(input));
+
+  const existing = await prisma.song.findUnique({ where: { id } });
+  if (!existing) throw new NotFoundError('Música não encontrada.');
+
+  return prisma.song.update({ where: { id }, data: toRow(data) });
+}
+
+export async function getSong(id) {
+  const song = await prisma.song.findUnique({ where: { id } });
+  if (!song) throw new NotFoundError('Música não encontrada.');
+  return song;
+}
+
+/**
+ * Catálogo central: busca por título, trecho da letra, momento do rito e
+ * tempo litúrgico. Músicas sem tempo definido servem em qualquer celebração,
+ * por isso continuam aparecendo no filtro por tempo.
+ *
+ * @param {{query?: string, moment?: string, season?: string, limit?: number}} filters
+ */
+export async function searchSongs(filters = {}) {
+  const { query, moment, season, limit } = filters;
+  const where = { AND: [] };
+
+  if (query?.trim()) {
+    const term = query.trim();
+    where.AND.push({
+      OR: [
+        { title: { contains: term, mode: 'insensitive' } },
+        { plainLyrics: { contains: term, mode: 'insensitive' } },
+        { composer: { contains: term, mode: 'insensitive' } },
+      ],
+    });
+  }
+  if (moment) where.AND.push({ moments: { has: moment } });
+  if (season) {
+    where.AND.push({ OR: [{ seasons: { has: season } }, { seasons: { isEmpty: true } }] });
+  }
+  if (where.AND.length === 0) delete where.AND;
+
+  return prisma.song.findMany({
+    where,
+    orderBy: { title: 'asc' },
+    take: Math.min(limit ?? 50, MAX_RESULTS),
+  });
+}
+
+export async function deleteSong(id, actor) {
+  assertCan(actor, ACTIONS.MANAGE_SONG);
+
+  const song = await prisma.song.findUnique({
+    where: { id },
+    include: { _count: { select: { repertoire: true } } },
+  });
+  if (!song) throw new NotFoundError('Música não encontrada.');
+  if (song._count.repertoire > 0) {
+    throw new ConflictError(
+      'Esta música está no roteiro de uma celebração. Retire-a do roteiro antes de excluir.',
+    );
+  }
+
+  await prisma.song.delete({ where: { id } });
+  return { id };
+}

@@ -1,0 +1,863 @@
+/*
+ * Base visual do sistema.
+ *
+ * A prioridade é a leitura no celular durante a celebração: contraste alto,
+ * tipografia grande na cifra e nenhuma rolagem horizontal. Tudo é escrito
+ * primeiro para telas estreitas; as consultas de mídia acrescentam colunas
+ * quando há espaço.
+ */
+
+:root {
+  --bg: #f7f5f1;
+  --surface: #ffffff;
+  --surface-alt: #f1eee8;
+  --border: #ddd6ca;
+  --text: #21201d;
+  --text-soft: #6b665d;
+  --accent: #6b2d5b;
+  --accent-soft: #f3e8f0;
+  --chord: #9c3d10;
+  --chorus: #f6f1e4;
+  --danger: #a12d1f;
+  --ok: #2f6b3a;
+
+  /* Cores litúrgicas, usadas como marcação discreta na agenda. */
+  --season-advento: #6b3fa0;
+  --season-natal: #b58a2b;
+  --season-quaresma: #6b3fa0;
+  --season-triduo: #a12d1f;
+  --season-pascoa: #b58a2b;
+  --season-comum: #2f6b3a;
+
+  --radius: 10px;
+  --shadow: 0 1px 2px rgba(33, 32, 29, 0.06), 0 4px 12px rgba(33, 32, 29, 0.05);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.2;
+  margin: 0 0 0.5rem;
+}
+
+/* ---------- Estrutura ---------- */
+
+.shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.topbar-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.brand {
+  font-weight: 700;
+  color: var(--accent);
+  font-size: 1.05rem;
+  margin-right: auto;
+}
+
+.brand span {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-soft);
+}
+
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  order: 3;
+  width: 100%;
+}
+
+.nav a {
+  padding: 0.4rem 0.7rem;
+  border-radius: 999px;
+  color: var(--text-soft);
+  font-size: 0.92rem;
+}
+
+.nav a[aria-current='page'] {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.who {
+  font-size: 0.82rem;
+  color: var(--text-soft);
+  text-align: right;
+}
+
+.who strong {
+  display: block;
+  color: var(--text);
+}
+
+.main {
+  flex: 1;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1rem 1rem 3rem;
+}
+
+.footer {
+  border-top: 1px solid var(--border);
+  padding: 1rem;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-soft);
+}
+
+@media (min-width: 720px) {
+  .nav {
+    order: 2;
+    width: auto;
+  }
+  .main {
+    padding: 1.5rem 1.5rem 4rem;
+  }
+}
+
+/* ---------- Peças reutilizáveis ---------- */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  box-shadow: var(--shadow);
+}
+
+.page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.page-head h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.page-head p {
+  margin: 0.15rem 0 0;
+  color: var(--text-soft);
+  font-size: 0.9rem;
+}
+
+.page-head .grow {
+  margin-right: auto;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 44px;
+  padding: 0.55rem 1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.btn--ghost {
+  background: var(--surface);
+  color: var(--accent);
+}
+
+.btn--danger {
+  background: var(--surface);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.btn--small {
+  min-height: 32px;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+}
+
+.btn--round {
+  width: 48px;
+  min-width: 48px;
+  padding: 0;
+  font-size: 1.4rem;
+  border-radius: 999px;
+}
+
+.tag {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--surface-alt);
+  color: var(--text-soft);
+  border: 1px solid var(--border);
+}
+
+.tag--solene {
+  background: #fdf3e2;
+  border-color: #e6c98a;
+  color: #8a5b12;
+}
+
+.tag--ensaio {
+  background: #eef3f8;
+  border-color: #b8cbdd;
+  color: #2d5573;
+}
+
+.tag--key {
+  background: #fdeee6;
+  border-color: #edc4ad;
+  color: var(--chord);
+}
+
+.field {
+  display: block;
+  margin-bottom: 0.9rem;
+}
+
+.field > span {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.3rem;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+textarea {
+  min-height: 12rem;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.error {
+  color: var(--danger);
+  font-size: 0.85rem;
+  margin: 0.2rem 0 0;
+}
+
+.notice {
+  background: var(--accent-soft);
+  border: 1px solid #e2cfdd;
+  border-radius: var(--radius);
+  padding: 0.7rem 0.9rem;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.empty {
+  text-align: center;
+  color: var(--text-soft);
+  padding: 2rem 1rem;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.grid-2 {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 720px) {
+  .grid-2 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* ---------- Entrada e cadastro ---------- */
+
+.auth {
+  max-width: 26rem;
+  margin: 2rem auto;
+}
+
+/* ---------- Agenda ---------- */
+
+.calendar-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.calendar-head h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  text-transform: capitalize;
+  margin-right: auto;
+}
+
+.calendar {
+  display: none;
+}
+
+.calendar-weekdays,
+.calendar-week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.calendar-weekdays span {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text-soft);
+  padding: 0.25rem 0;
+  text-transform: uppercase;
+}
+
+.calendar-day {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  min-height: 5.5rem;
+  padding: 0.3rem;
+  font-size: 0.8rem;
+}
+
+.calendar-day--out {
+  background: var(--surface-alt);
+  color: var(--text-soft);
+}
+
+.calendar-day--today {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.calendar-day-number {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-weight: 600;
+  margin-bottom: 0.2rem;
+}
+
+.season-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.season-dot[data-season='ADVENTO'],
+.season-dot[data-season='QUARESMA'] {
+  background: var(--season-quaresma);
+}
+.season-dot[data-season='NATAL'],
+.season-dot[data-season='PASCOA'] {
+  background: var(--season-natal);
+}
+.season-dot[data-season='TRIDUO_PASCAL'] {
+  background: var(--season-triduo);
+}
+.season-dot[data-season='TEMPO_COMUM'] {
+  background: var(--season-comum);
+}
+
+.calendar-event {
+  display: block;
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+  border-radius: 4px;
+  padding: 0.15rem 0.3rem;
+  margin-bottom: 2px;
+  font-size: 0.72rem;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calendar-event[data-type='MISSA_SOLENE'] {
+  border-left-color: #b58a2b;
+  background: #fdf3e2;
+}
+
+.calendar-event[data-type='ENSAIO'] {
+  border-left-color: #2d5573;
+  background: #eef3f8;
+}
+
+/* A grade só aparece quando há largura para sete colunas legíveis; no
+   celular a agenda vira lista, que é como se consulta no dia da missa. */
+@media (min-width: 860px) {
+  .calendar {
+    display: block;
+  }
+  .agenda-list--mobile {
+    display: none;
+  }
+}
+
+.agenda-item {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.7rem;
+  margin-bottom: 0.5rem;
+}
+
+.agenda-date {
+  text-align: center;
+  min-width: 3rem;
+}
+
+.agenda-date strong {
+  display: block;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.agenda-date span {
+  font-size: 0.7rem;
+  color: var(--text-soft);
+  text-transform: uppercase;
+}
+
+.agenda-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.agenda-body h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.agenda-body p {
+  margin: 0.1rem 0 0;
+  font-size: 0.82rem;
+  color: var(--text-soft);
+}
+
+/* ---------- Cifra ---------- */
+
+.sheet {
+  font-size: 1.05rem;
+  line-height: 1.35;
+}
+
+.sheet-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  margin: 0 0 0.35rem;
+}
+
+/* A palavra inteira é indivisível: a linha quebra entre palavras, nunca no
+   meio de uma palavra cifrada. */
+.word {
+  display: inline-flex;
+  white-space: nowrap;
+}
+
+/* Acorde e sílaba no mesmo bloco: se a linha quebrar, quebram juntos e o
+   acorde nunca escorrega para outra sílaba. */
+.pair {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.pair-chord {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.85em;
+  font-weight: 700;
+  color: var(--chord);
+  min-height: 1.25em;
+  white-space: pre;
+  padding-right: 0.35em;
+}
+
+.pair-lyric {
+  white-space: pre-wrap;
+}
+
+.sheet--lyrics-only .sheet-line {
+  align-items: baseline;
+}
+
+.sheet-gap {
+  height: 0.9rem;
+}
+
+.sheet-comment {
+  margin: 0.6rem 0 0.2rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-soft);
+}
+
+.sheet-line--chorus {
+  background: var(--chorus);
+  border-left: 3px solid #d9c48a;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+}
+
+.sheet-empty {
+  color: var(--text-soft);
+  font-style: italic;
+}
+
+/* ---------- Tela do músico ---------- */
+
+.viewer-head {
+  margin-bottom: 0.75rem;
+}
+
+.viewer-moment {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+}
+
+.viewer-title {
+  font-size: 1.4rem;
+  margin: 0.1rem 0;
+}
+
+.viewer-meta {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-soft);
+}
+
+/* Os controles de tom ficam sempre alcançáveis pelo polegar. */
+.viewer-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  position: sticky;
+  top: 3.4rem;
+  z-index: 5;
+  background: var(--bg);
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0.9rem;
+}
+
+.viewer-key {
+  text-align: center;
+  min-width: 3.5rem;
+}
+
+.viewer-key strong {
+  display: block;
+  font-size: 1.3rem;
+  line-height: 1;
+  color: var(--chord);
+}
+
+.viewer-key-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+
+/* ---------- Editor dividido ---------- */
+
+.editor {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 900px) {
+  .editor {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+}
+
+.editor-pane {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.9rem;
+}
+
+.editor-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin: 0 0 0.2rem;
+}
+
+.editor-hint {
+  font-size: 0.8rem;
+  color: var(--text-soft);
+  margin: 0 0 0.6rem;
+}
+
+.editor-hint code {
+  background: var(--surface-alt);
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+  font-size: 0.95em;
+}
+
+.editor-textarea {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  min-height: 18rem;
+  resize: vertical;
+}
+
+.editor-status {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: var(--text-soft);
+  margin-top: 0.4rem;
+}
+
+.editor-preview {
+  min-height: 18rem;
+  background: var(--surface-alt);
+  border-radius: 8px;
+  padding: 0.8rem;
+  overflow-x: auto;
+}
+
+/* ---------- Roteiro ---------- */
+
+.script-item {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--radius);
+  margin-bottom: 0.75rem;
+  overflow: hidden;
+}
+
+.script-item > summary {
+  cursor: pointer;
+  padding: 0.7rem 0.9rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  font-weight: 600;
+}
+
+.script-item > summary::marker {
+  color: var(--text-soft);
+}
+
+.script-moment {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  width: 100%;
+  font-weight: 700;
+}
+
+.script-body {
+  padding: 0 0.9rem 0.9rem;
+  border-top: 1px solid var(--border);
+}
+
+.moment-row {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.moment-row:last-child {
+  border-bottom: 0;
+}
+
+.moment-row-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-soft);
+}
+
+@media (min-width: 720px) {
+  .moment-row {
+    grid-template-columns: 10rem 1fr 6rem;
+    align-items: center;
+    gap: 0.75rem;
+  }
+}
+
+/* ---------- Acervo ---------- */
+
+.song-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.song-list li {
+  border-bottom: 1px solid var(--border);
+}
+
+.song-link {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: baseline;
+  padding: 0.75rem 0.2rem;
+  color: var(--text);
+}
+
+.song-link strong {
+  font-size: 1rem;
+}
+
+.song-link small {
+  color: var(--text-soft);
+}
+
+.song-snippet {
+  width: 100%;
+  font-size: 0.82rem;
+  color: var(--text-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filters {
+  display: grid;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+@media (min-width: 720px) {
+  .filters {
+    grid-template-columns: 2fr 1fr 1fr auto;
+    align-items: end;
+  }
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 0.6rem 0.4rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+@media print {
+  .topbar,
+  .footer,
+  .viewer-controls,
+  .btn {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+  }
+}

@@ -1,0 +1,130 @@
+// Coral Litúrgico — modelo de dados
+// Banco relacional (PostgreSQL) acessado via Prisma ORM.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Papéis de usuário: o Coordenador organiza calendário e acervo,
+/// o Músico consulta escalas e cifras.
+enum Role {
+  COORDENADOR
+  MUSICO
+}
+
+/// Natureza da celebração no painel de agenda.
+enum CelebrationType {
+  MISSA_COMUM
+  MISSA_SOLENE
+  ENSAIO
+}
+
+/// Tempos litúrgicos do Rito Romano.
+enum LiturgicalSeason {
+  ADVENTO
+  NATAL
+  QUARESMA
+  TRIDUO_PASCAL
+  PASCOA
+  TEMPO_COMUM
+}
+
+/// Momentos do rito aos quais uma música pode ser associada.
+enum LiturgicalMoment {
+  ENTRADA
+  ATO_PENITENCIAL
+  GLORIA
+  SALMO
+  ACLAMACAO
+  OFERTORIO
+  SANTO
+  CORDEIRO
+  COMUNHAO
+  ACAO_DE_GRACAS
+  FINAL
+}
+
+model User {
+  id                String   @id @default(cuid())
+  name              String
+  email             String   @unique
+  passwordHash      String
+  /// Voz ou instrumento (ex.: "Soprano", "Violão").
+  voiceOrInstrument String
+  role              Role     @default(MUSICO)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  celebrations Celebration[] @relation("CelebrationCreatedBy")
+  songs        Song[]        @relation("SongCreatedBy")
+
+  @@index([role])
+}
+
+model Celebration {
+  id          String           @id @default(cuid())
+  title       String
+  /// Data e horário da celebração.
+  date        DateTime
+  type        CelebrationType  @default(MISSA_COMUM)
+  season      LiturgicalSeason
+  location    String?
+  notes       String?
+  createdById String?
+  createdBy   User?            @relation("CelebrationCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  repertoire RepertoireItem[]
+
+  @@index([date])
+  @@index([type])
+}
+
+model Song {
+  id          String             @id @default(cuid())
+  title       String
+  composer    String?
+  /// Letra com cifras em formato ChordPro: "[G]Pai Nosso que est[C]ais no c[G]éu".
+  chordPro    String
+  /// Tom original em que a cifra foi escrita (ex.: "G", "Bb", "F#m").
+  originalKey String
+  /// Momentos do rito para os quais a música é adequada.
+  moments     LiturgicalMoment[]
+  /// Tempos litúrgicos adequados; vazio significa "qualquer tempo".
+  seasons     LiturgicalSeason[]
+  /// Texto da letra sem acordes, mantido para busca por trecho.
+  plainLyrics String
+  createdById String?
+  createdBy   User?              @relation("SongCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  repertoire RepertoireItem[]
+
+  @@index([title])
+}
+
+/// Roteiro musical: liga uma música do acervo a um momento do rito
+/// de uma celebração específica.
+model RepertoireItem {
+  id            String           @id @default(cuid())
+  celebrationId String
+  celebration   Celebration      @relation(fields: [celebrationId], references: [id], onDelete: Cascade)
+  songId        String
+  song          Song             @relation(fields: [songId], references: [id], onDelete: Restrict)
+  moment        LiturgicalMoment
+  /// Ordem dentro do mesmo momento (permite duas músicas na comunhão).
+  position      Int              @default(0)
+  /// Tom escolhido para esta celebração; nulo usa o tom original.
+  keyOverride   String?
+  createdAt     DateTime         @default(now())
+
+  @@unique([celebrationId, moment, position])
+  @@index([songId])
+}
