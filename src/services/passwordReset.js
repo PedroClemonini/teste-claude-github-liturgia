@@ -36,7 +36,10 @@ function appBaseUrl() {
     console.warn('[passwordReset] APP_URL/NEXTAUTH_URL ausente; usando http://localhost:3000');
     return 'http://localhost:3000';
   }
-  return raw.replace(/\/+$/, '');
+  // "dominio.com.br" sem esquema viraria um link que o leitor de e-mail não
+  // reconhece; produção é sempre HTTPS.
+  const base = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+  return base.replace(/\/+$/, '');
 }
 
 const MENSAGEM_NEUTRA =

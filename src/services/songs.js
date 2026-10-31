@@ -93,7 +93,7 @@ export async function deleteSong(id, actor) {
   if (!song) throw new NotFoundError('Música não encontrada.');
   if (song._count.repertoire > 0) {
     throw new ConflictError(
-      'Esta música está no roteiro de uma evento. Retire-a do roteiro antes de excluir.',
+      'Esta música está no roteiro de um evento. Retire-a do roteiro antes de removê-la do acervo.',
     );
   }
 

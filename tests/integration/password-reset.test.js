@@ -122,6 +122,16 @@ describe('requestPasswordReset', () => {
     await requestPasswordReset({ email: 'maria@paroquia.org' });
     expect(enviados[0].text).toMatch(/https?:\/\/[^\s]+\/redefinir-senha\?token=/);
   });
+
+  it('APP_URL sem esquema ganha https://', async () => {
+    vi.stubEnv('APP_URL', 'paroquia.org.br/');
+    try {
+      await requestPasswordReset({ email: 'maria@paroquia.org' });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+    expect(enviados[0].text).toMatch(/^https:\/\/paroquia\.org\.br\/redefinir-senha\?token=/m);
+  });
 });
 
 describe('checkResetToken', () => {

@@ -8,6 +8,7 @@ import { isCoordinator } from '@/domain/auth/roles.js';
 import { getVideoEmbedUrl } from '@/domain/video/embed.js';
 import { SongViewer } from '@/components/SongViewer.jsx';
 import { PerformanceMode } from '@/components/PerformanceMode.jsx';
+import { DeleteSongButton } from '@/components/DeleteSongButton.jsx';
 
 export const metadata = { title: 'Cifra · Coral Litúrgico' };
 
@@ -48,9 +49,12 @@ export default async function MusicaPage({ params }) {
             ]}
           />
           {isCoordinator(user) && (
-            <Link className="btn btn--ghost" href={`/acervo/${song.id}/editar`}>
-              Editar
-            </Link>
+            <>
+              <Link className="btn btn--ghost" href={`/acervo/${song.id}/editar`}>
+                Editar
+              </Link>
+              <DeleteSongButton songId={song.id} title={song.title} />
+            </>
           )}
         </span>
       </div>
