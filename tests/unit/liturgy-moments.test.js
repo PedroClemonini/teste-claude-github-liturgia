@@ -16,6 +16,7 @@ describe('catálogo de momentos', () => {
       'GLORIA',
       'SALMO',
       'ACLAMACAO',
+      'LADAINHA',
       'OFERTORIO',
       'SANTO',
       'ORACAO_EUCARISTICA',
@@ -68,6 +69,6 @@ describe('missingMoments', () => {
     const missing = missingMoments(items);
     expect(missing).not.toContain('ENTRADA');
     expect(missing).toContain('SALMO');
-    expect(missing).toHaveLength(12);
+    expect(missing).toHaveLength(13);
   });
 });

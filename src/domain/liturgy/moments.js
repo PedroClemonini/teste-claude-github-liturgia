@@ -9,6 +9,7 @@ export const LITURGICAL_MOMENTS = [
   { id: 'GLORIA', label: 'Glória' },
   { id: 'SALMO', label: 'Salmo' },
   { id: 'ACLAMACAO', label: 'Aclamação' },
+  { id: 'LADAINHA', label: 'Ladainha (Preces)' },
   { id: 'OFERTORIO', label: 'Ofertório' },
   { id: 'SANTO', label: 'Santo' },
   { id: 'ORACAO_EUCARISTICA', label: 'Oração Eucarística' },
