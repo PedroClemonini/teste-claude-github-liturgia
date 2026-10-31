@@ -55,7 +55,7 @@ describe('SongViewer', () => {
     expect(chords()).toEqual(['G', 'C', 'G']);
   });
 
-  it('começa no tom definido para a celebração quando ele é informado', () => {
+  it('começa no tom definido para a evento quando ele é informado', () => {
     render(<SongViewer song={song} performanceKey="A" />);
     expect(screen.getByTestId('current-key').textContent).toBe('A');
     expect(chords()).toEqual(['A', 'D', 'A']);
@@ -81,7 +81,7 @@ describe('SongViewer', () => {
 });
 
 describe('SongViewer — cifra e tom coerentes', () => {
-  it('não transpõe nada quando o tom da celebração é o próprio tom da cifra', () => {
+  it('não transpõe nada quando o tom da evento é o próprio tom da cifra', () => {
     render(<SongViewer song={song} performanceKey="G" />);
     expect(screen.getByTestId('current-key').textContent).toBe('G');
     expect(chords()).toEqual(['G', 'C', 'G']);

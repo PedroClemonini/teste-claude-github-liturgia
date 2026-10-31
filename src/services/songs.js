@@ -19,6 +19,7 @@ function toRow(data) {
     composer: data.composer ?? null,
     chordPro: data.chordPro,
     originalKey: data.originalKey,
+    audioUrl: data.audioUrl ?? null,
     moments: data.moments,
     seasons: data.seasons,
     plainLyrics: extractPlainLyrics(data.chordPro),
@@ -50,7 +51,7 @@ export async function getSong(id) {
 
 /**
  * Catálogo central: busca por título, trecho da letra, momento do rito e
- * tempo litúrgico. Músicas sem tempo definido servem em qualquer celebração,
+ * tempo litúrgico. Músicas sem tempo definido servem em qualquer evento,
  * por isso continuam aparecendo no filtro por tempo.
  *
  * @param {{query?: string, moment?: string, season?: string, limit?: number}} filters
@@ -92,7 +93,7 @@ export async function deleteSong(id, actor) {
   if (!song) throw new NotFoundError('Música não encontrada.');
   if (song._count.repertoire > 0) {
     throw new ConflictError(
-      'Esta música está no roteiro de uma celebração. Retire-a do roteiro antes de excluir.',
+      'Esta música está no roteiro de uma evento. Retire-a do roteiro antes de excluir.',
     );
   }
 

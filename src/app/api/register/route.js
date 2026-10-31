@@ -1,7 +1,7 @@
 import { handle, json, readJson } from '@/lib/api.js';
 import { registerUser } from '@/services/users.js';
 
-/** Cadastro simples e público — sempre entra como Músico. */
+/** Cadastro só por convite — quem usa o link entra como Músico na capela do convite. */
 export async function POST(request) {
   return handle(async () => {
     const body = await readJson(request);

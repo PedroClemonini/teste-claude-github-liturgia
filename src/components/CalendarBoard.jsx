@@ -47,17 +47,21 @@ export function CalendarBoard({ year, month, celebrations, today }) {
                   />
                   {day.day}
                 </div>
-                {day.celebrations.map((celebration) => (
-                  <Link
-                    key={celebration.id}
-                    href={`/celebracoes/${celebration.id}`}
-                    className="calendar-event"
-                    data-type={celebration.type}
-                    title={`${celebration.title} · ${celebrationTypeLabel(celebration.type)}`}
-                  >
-                    {hora(celebration.date)} {celebration.title}
-                  </Link>
-                ))}
+                <div
+                  className={`calendar-day-events ${day.celebrations.length > 3 ? 'calendar-day-events--compact' : ''}`}
+                >
+                  {day.celebrations.map((celebration) => (
+                    <Link
+                      key={celebration.id}
+                      href={`/celebracoes/${celebration.id}`}
+                      className="calendar-event"
+                      data-type={celebration.type}
+                      title={`${celebration.title} · ${celebrationTypeLabel(celebration.type)}`}
+                    >
+                      {hora(celebration.date)} {celebration.title}
+                    </Link>
+                  ))}
+                </div>
               </div>
             ))}
           </div>
@@ -74,7 +78,7 @@ export function CalendarBoard({ year, month, celebrations, today }) {
 /** Lista cronológica das celebrações, com o indicador de roteiro. */
 export function AgendaList({ celebrations }) {
   if (celebrations.length === 0) {
-    return <p className="empty">Nenhuma celebração neste período.</p>;
+    return <p className="empty">Nenhuma evento neste período.</p>;
   }
 
   return (

@@ -21,14 +21,44 @@ export function SongForm({ song = null }) {
     composer: song?.composer ?? '',
     chordPro: song?.chordPro ?? '',
     originalKey: song?.originalKey ?? '',
+    audioUrl: song?.audioUrl ?? '',
     moments: song?.moments ?? [],
     seasons: song?.seasons ?? [],
   });
   const [errors, setErrors] = useState({});
   const [message, setMessage] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [importUrl, setImportUrl] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState(null);
 
   const update = (field) => (event) => setForm({ ...form, [field]: event.target.value });
+
+  const importFromCifraClub = async (event) => {
+    event.preventDefault();
+    setImporting(true);
+    setImportError(null);
+
+    const response = await fetch('/api/songs/import', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ url: importUrl }),
+    });
+    const body = await response.json().catch(() => ({}));
+    setImporting(false);
+
+    if (!response.ok) {
+      setImportError(body.error ?? 'Não foi possível importar essa cifra.');
+      return;
+    }
+
+    setForm((current) => ({
+      ...current,
+      title: body.song.title || current.title,
+      originalKey: body.song.originalKey || current.originalKey,
+      chordPro: body.song.chordPro,
+    }));
+  };
 
   const toggle = (field, value) =>
     setForm((current) => ({
@@ -54,6 +84,7 @@ export function SongForm({ song = null }) {
         composer: form.composer || null,
         // Em branco, o servidor deduz o tom a partir do primeiro acorde.
         originalKey: form.originalKey || undefined,
+        audioUrl: form.audioUrl || null,
       }),
     });
     const body = await response.json().catch(() => ({}));
@@ -71,6 +102,30 @@ export function SongForm({ song = null }) {
 
   return (
     <form onSubmit={submit} noValidate>
+      {!editando && (
+        <div className="card" style={{ marginBottom: '1rem' }}>
+          <label className="field">
+            <span>Importar do CifraClub (opcional)</span>
+            <div className="row">
+              <input
+                type="url"
+                value={importUrl}
+                onChange={(event) => setImportUrl(event.target.value)}
+                placeholder="https://www.cifraclub.com.br/..."
+                style={{ flex: 1 }}
+              />
+              <button className="btn" type="button" onClick={importFromCifraClub} disabled={importing || !importUrl}>
+                {importing ? 'Importando…' : 'Importar'}
+              </button>
+            </div>
+          </label>
+          {importError && <p className="error">{importError}</p>}
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-soft)' }}>
+            Preenche o título, o tom e a cifra abaixo a partir da página — revise antes de salvar.
+          </p>
+        </div>
+      )}
+
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="grid-2">
           <label className="field">
@@ -95,16 +150,27 @@ export function SongForm({ song = null }) {
           {errors.originalKey && <p className="error">{errors.originalKey}</p>}
         </label>
 
+        <label className="field">
+          <span>Link para ouvir (opcional)</span>
+          <input
+            type="url"
+            value={form.audioUrl}
+            onChange={update('audioUrl')}
+            placeholder="https://youtube.com/..."
+          />
+          {errors.audioUrl && <p className="error">{errors.audioUrl}</p>}
+        </label>
+
         <fieldset style={{ border: 0, padding: 0, margin: '0 0 0.8rem' }}>
           <legend style={{ fontSize: '0.85rem', fontWeight: 600, padding: 0 }}>
             Momentos do rito em que serve
           </legend>
           <div className="row">
             {LITURGICAL_MOMENTS.map((moment) => (
-              <label key={moment.id} className="tag" style={{ cursor: 'pointer' }}>
+              <label key={moment.id} className="tag tag--choice" style={{ cursor: 'pointer' }}>
                 <input
                   type="checkbox"
-                  style={{ width: 'auto', minHeight: 0, marginRight: '0.3rem' }}
+                  style={{ width: '1.1rem', height: '1.1rem', minHeight: 0, marginRight: '0.4rem' }}
                   checked={form.moments.includes(moment.id)}
                   onChange={() => toggle('moments', moment.id)}
                 />
@@ -120,10 +186,10 @@ export function SongForm({ song = null }) {
           </legend>
           <div className="row">
             {LITURGICAL_SEASONS.map((season) => (
-              <label key={season.id} className="tag" style={{ cursor: 'pointer' }}>
+              <label key={season.id} className="tag tag--choice" style={{ cursor: 'pointer' }}>
                 <input
                   type="checkbox"
-                  style={{ width: 'auto', minHeight: 0, marginRight: '0.3rem' }}
+                  style={{ width: '1.1rem', height: '1.1rem', minHeight: 0, marginRight: '0.4rem' }}
                   checked={form.seasons.includes(season.id)}
                   onChange={() => toggle('seasons', season.id)}
                 />

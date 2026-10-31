@@ -10,14 +10,16 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// Papéis de usuário: o Coordenador organiza calendário e acervo,
-/// o Músico consulta escalas e cifras.
+/// Papéis de usuário: o Administrador funda capelas e concede coordenações,
+/// o Coordenador organiza calendário e acervo da própria capela, o Músico
+/// consulta escalas e cifras.
 enum Role {
+  ADMINISTRADOR
   COORDENADOR
   MUSICO
 }
 
-/// Natureza da celebração no painel de agenda.
+/// Natureza da evento no painel de agenda.
 enum CelebrationType {
   MISSA_COMUM
   MISSA_SOLENE
@@ -43,6 +45,9 @@ enum LiturgicalMoment {
   ACLAMACAO
   OFERTORIO
   SANTO
+  ORACAO_EUCARISTICA
+  MISTERIO_DA_FE
+  GRANDE_AMEM
   CORDEIRO
   COMUNHAO
   ACAO_DE_GRACAS
@@ -57,33 +62,98 @@ model User {
   /// Voz ou instrumento (ex.: "Soprano", "Violão").
   voiceOrInstrument String
   role              Role     @default(MUSICO)
+  /// Capela-casa do integrante; nula só em contas legadas/órfãs.
+  capelaId          String?
+  capela            Capela?  @relation("UserHomeCapela", fields: [capelaId], references: [id], onDelete: SetNull)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  celebrations Celebration[] @relation("CelebrationCreatedBy")
-  songs        Song[]        @relation("SongCreatedBy")
+  celebrations       Celebration[] @relation("CelebrationCreatedBy")
+  songs              Song[]        @relation("SongCreatedBy")
+  capelasCreated     Capela[]      @relation("CapelaCreatedBy")
+  invitesCreated     Invite[]      @relation("InviteCreatedBy")
+  invitesRedeemed    Invite[]      @relation("InviteUsedBy")
+  /// Celebrações em que canta ou toca, mesmo as de outra capela (participação mista).
+  participatingIn    Celebration[] @relation("CelebrationParticipants")
+  passwordResets     PasswordResetToken[]
 
   @@index([role])
+  @@index([capelaId])
+}
+
+/// Uma capela/paróquia: agrupa membros e celebrações sob um mesmo coordenador.
+model Capela {
+  id          String   @id @default(cuid())
+  name        String
+  createdById String?
+  createdBy   User?    @relation("CapelaCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members      User[]        @relation("UserHomeCapela")
+  celebrations Celebration[] @relation("CelebrationCapela")
+  invites      Invite[]
+
+  @@index([createdById])
+}
+
+/// Convite de cadastro: um link/token que um coordenador gera para uma
+/// capela específica. Quem usa entra direto naquela capela, como Músico.
+model Invite {
+  id          String    @id @default(cuid())
+  token       String    @unique
+  capelaId    String
+  capela      Capela    @relation(fields: [capelaId], references: [id], onDelete: Cascade)
+  createdById String?
+  createdBy   User?     @relation("InviteCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  expiresAt   DateTime
+  usedAt      DateTime?
+  usedById    String?
+  usedBy      User?     @relation("InviteUsedBy", fields: [usedById], references: [id], onDelete: SetNull)
+  createdAt   DateTime  @default(now())
+
+  @@index([capelaId])
+}
+
+/// Pedido de "esqueci minha senha". Guardamos apenas o SHA-256 do token: o
+/// valor em claro só existe no link enviado por e-mail, então quem ler o
+/// banco não consegue redefinir a senha de ninguém. Cada token vale uma vez
+/// e expira em pouco tempo.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
 }
 
 model Celebration {
   id          String           @id @default(cuid())
   title       String
-  /// Data e horário da celebração.
+  /// Data e horário da evento.
   date        DateTime
   type        CelebrationType  @default(MISSA_COMUM)
   season      LiturgicalSeason
   location    String?
   notes       String?
+  capelaId    String
+  capela      Capela           @relation("CelebrationCapela", fields: [capelaId], references: [id], onDelete: Cascade)
   createdById String?
   createdBy   User?            @relation("CelebrationCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
   repertoire RepertoireItem[]
+  /// Integrantes escalados, de qualquer capela (a própria some primeiro na tela).
+  participants User[] @relation("CelebrationParticipants")
 
   @@index([date])
   @@index([type])
+  @@index([capelaId])
 }
 
 model Song {
@@ -94,6 +164,8 @@ model Song {
   chordPro    String
   /// Tom original em que a cifra foi escrita (ex.: "G", "Bb", "F#m").
   originalKey String
+  /// Link externo para ouvir a música (YouTube, Spotify etc.).
+  audioUrl    String?
   /// Momentos do rito para os quais a música é adequada.
   moments     LiturgicalMoment[]
   /// Tempos litúrgicos adequados; vazio significa "qualquer tempo".
@@ -111,7 +183,7 @@ model Song {
 }
 
 /// Roteiro musical: liga uma música do acervo a um momento do rito
-/// de uma celebração específica.
+/// de uma evento específica.
 model RepertoireItem {
   id            String           @id @default(cuid())
   celebrationId String
@@ -121,7 +193,7 @@ model RepertoireItem {
   moment        LiturgicalMoment
   /// Ordem dentro do mesmo momento (permite duas músicas na comunhão).
   position      Int              @default(0)
-  /// Tom escolhido para esta celebração; nulo usa o tom original.
+  /// Tom escolhido para esta evento; nulo usa o tom original.
   keyOverride   String?
   createdAt     DateTime         @default(now())
 

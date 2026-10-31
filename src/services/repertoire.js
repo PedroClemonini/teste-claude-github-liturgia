@@ -3,15 +3,25 @@
  */
 import { prisma } from '@/lib/prisma.js';
 import { repertoireItemSchema } from '@/domain/validation/schemas.js';
-import { ACTIONS, assertCan } from '@/domain/auth/roles.js';
+import { ACTIONS, assertCan, assertManagesCapela } from '@/domain/auth/roles.js';
+import { canViewCelebration } from '@/services/celebrations.js';
 import { momentLabel, sortRepertoire } from '@/domain/liturgy/moments.js';
 import { semitonesBetween, transposeChordPro } from '@/domain/chordpro/transpose.js';
 import { ConflictError, NotFoundError, unwrap } from '@/domain/errors.js';
 
 async function requireCelebration(celebrationId) {
-  const celebration = await prisma.celebration.findUnique({ where: { id: celebrationId } });
-  if (!celebration) throw new NotFoundError('Celebração não encontrada.');
+  const celebration = await prisma.celebration.findUnique({
+    where: { id: celebrationId },
+    include: { capela: true, participants: { select: { id: true } } },
+  });
+  if (!celebration) throw new NotFoundError('evento não encontrada.');
   return celebration;
+}
+
+/** Leitura (roteiro/roteiro pronto): mesma regra 404 de `getCelebration`. */
+function requireCanView(actor, celebration) {
+  if (canViewCelebration(actor, celebration)) return;
+  throw new NotFoundError('evento não encontrada.');
 }
 
 async function requireSongs(songIds) {
@@ -25,7 +35,7 @@ async function requireSongs(songIds) {
 }
 
 /**
- * Substitui o roteiro inteiro da celebração, em uma única transação: ou o novo
+ * Substitui o roteiro inteiro da evento, em uma única transação: ou o novo
  * roteiro entra completo, ou o anterior permanece como estava.
  *
  * @param {string} celebrationId
@@ -34,7 +44,8 @@ async function requireSongs(songIds) {
  */
 export async function setRepertoire(celebrationId, items, actor) {
   assertCan(actor, ACTIONS.MANAGE_REPERTOIRE);
-  await requireCelebration(celebrationId);
+  const celebration = await requireCelebration(celebrationId);
+  assertManagesCapela(actor, celebration.capela);
 
   const parsed = items.map((item) => unwrap(repertoireItemSchema.safeParse(item)));
 
@@ -61,7 +72,7 @@ export async function setRepertoire(celebrationId, items, actor) {
   return listRepertoire(celebrationId);
 }
 
-/** Roteiro da celebração, ordenado pelo rito. */
+/** Roteiro da evento, ordenado pelo rito. */
 export async function listRepertoire(celebrationId) {
   const items = await prisma.repertoireItem.findMany({
     where: { celebrationId },
@@ -73,7 +84,8 @@ export async function listRepertoire(celebrationId) {
 /** Acrescenta uma música, empilhando na próxima posição livre do momento. */
 export async function addRepertoireItem(celebrationId, input, actor) {
   assertCan(actor, ACTIONS.MANAGE_REPERTOIRE);
-  await requireCelebration(celebrationId);
+  const celebration = await requireCelebration(celebrationId);
+  assertManagesCapela(actor, celebration.capela);
   const data = unwrap(repertoireItemSchema.safeParse(input));
   await requireSongs([data.songId]);
 
@@ -94,15 +106,19 @@ export async function addRepertoireItem(celebrationId, input, actor) {
 
 export async function removeRepertoireItem(itemId, actor) {
   assertCan(actor, ACTIONS.MANAGE_REPERTOIRE);
-  const item = await prisma.repertoireItem.findUnique({ where: { id: itemId } });
+  const item = await prisma.repertoireItem.findUnique({
+    where: { id: itemId },
+    include: { celebration: { include: { capela: true } } },
+  });
   if (!item) throw new NotFoundError('Item do roteiro não encontrado.');
+  assertManagesCapela(actor, item.celebration.capela);
 
   await prisma.repertoireItem.delete({ where: { id: itemId } });
   return { id: itemId };
 }
 
 /**
- * Tom em que a música será executada nesta celebração.
+ * Tom em que a música será executada nesta evento.
  * @param {{keyOverride?: string|null, song: {originalKey: string}}} item
  */
 export function performanceKey(item) {
@@ -111,11 +127,12 @@ export function performanceKey(item) {
 
 /**
  * Roteiro pronto para a tela do músico: cada canto já vem com a cifra no tom
- * definido para a celebração, na ordem em que será cantado.
+ * definido para a evento, na ordem em que será cantado.
  */
 export async function buildScript(celebrationId, actor) {
   assertCan(actor, ACTIONS.VIEW_SONG);
-  await requireCelebration(celebrationId);
+  const celebration = await requireCelebration(celebrationId);
+  requireCanView(actor, celebration);
 
   const items = await listRepertoire(celebrationId);
   return items.map((item) => {
@@ -131,7 +148,7 @@ export async function buildScript(celebrationId, actor) {
       composer: item.song.composer,
       originalKey: item.song.originalKey,
       key,
-      // Pronto para imprimir ou consumir pela API, já no tom da celebração.
+      // Pronto para imprimir ou consumir pela API, já no tom da evento.
       chordPro: transposeChordPro(item.song.chordPro, semitones, { targetKey: key }),
       // Texto como foi cadastrado: é dele que a tela do músico parte para
       // transpor ao vivo, sem correr o risco de transpor duas vezes.

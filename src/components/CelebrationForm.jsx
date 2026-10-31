@@ -8,12 +8,12 @@ import { celebrationTypeLabel } from '@/domain/calendar/grid.js';
 const TIPOS = ['MISSA_COMUM', 'MISSA_SOLENE', 'ENSAIO'];
 
 /**
- * Cadastro e edição de celebração. O tempo litúrgico já vem sugerido pela
- * data escolhida — o coordenador só mexe quando a celebração pede outro.
+ * Cadastro e edição de evento. O tempo litúrgico já vem sugerido pela
+ * data escolhida — o coordenador só mexe quando a evento pede outro.
  *
- * @param {{celebration?: object}} props
+ * @param {{celebration?: object, capelas?: {id: string, name: string}[], participantOptions?: {id: string, name: string, capelaName: string|null, ownCapela: boolean}[]}} props
  */
-export function CelebrationForm({ celebration = null }) {
+export function CelebrationForm({ celebration = null, capelas = [], participantOptions = [] }) {
   const router = useRouter();
   const editando = Boolean(celebration);
 
@@ -25,12 +25,22 @@ export function CelebrationForm({ celebration = null }) {
     season: celebration?.season ?? '',
     location: celebration?.location ?? '',
     notes: celebration?.notes ?? '',
+    capelaId: celebration?.capelaId ?? capelas[0]?.id ?? '',
+    participantIds: celebration?.participants?.map((p) => p.id) ?? [],
   });
   const [errors, setErrors] = useState({});
   const [message, setMessage] = useState(null);
   const [busy, setBusy] = useState(false);
 
   const update = (field) => (event) => setForm({ ...form, [field]: event.target.value });
+
+  const toggleParticipant = (id) =>
+    setForm((current) => ({
+      ...current,
+      participantIds: current.participantIds.includes(id)
+        ? current.participantIds.filter((item) => item !== id)
+        : [...current.participantIds, id],
+    }));
 
   const sugestao = form.date ? seasonForDate(`${form.date}:00.000Z`) : null;
 
@@ -42,12 +52,14 @@ export function CelebrationForm({ celebration = null }) {
 
     const payload = {
       title: form.title,
-      // O horário digitado é o da celebração; guardamos exatamente ele.
+      // O horário digitado é o da evento; guardamos exatamente ele.
       date: `${form.date}:00.000Z`,
       type: form.type,
       season: form.season || undefined,
       location: form.location || null,
       notes: form.notes || null,
+      capelaId: form.capelaId || undefined,
+      participantIds: form.participantIds,
     };
 
     const response = await fetch(
@@ -73,6 +85,30 @@ export function CelebrationForm({ celebration = null }) {
 
   return (
     <form onSubmit={submit} className="card" noValidate>
+      {(editando || capelas.length > 0) && (
+        <label className="field" style={{ maxWidth: !editando && capelas.length > 1 ? 'none' : '16rem' }}>
+          <span>Capela{editando ? ' (não muda depois de criada)' : ''}</span>
+          {!editando && capelas.length > 1 ? (
+            <select value={form.capelaId} onChange={update('capelaId')}>
+              {capelas.map((capela) => (
+                <option key={capela.id} value={capela.id}>
+                  {capela.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              value={
+                editando
+                  ? (celebration.capela?.name ?? '')
+                  : (capelas.find((capela) => capela.id === form.capelaId)?.name ?? capelas[0]?.name ?? '')
+              }
+              disabled
+            />
+          )}
+        </label>
+      )}
+
       <label className="field">
         <span>Título</span>
         <input
@@ -134,10 +170,32 @@ export function CelebrationForm({ celebration = null }) {
         />
       </label>
 
+      {participantOptions.length > 0 && (
+        <fieldset style={{ border: 0, padding: 0, margin: '0 0 0.8rem' }}>
+          <legend style={{ fontSize: '0.85rem', fontWeight: 600, padding: 0 }}>
+            Participantes (opcional — sua capela aparece primeiro)
+          </legend>
+          <div className="row">
+            {participantOptions.map((participant) => (
+              <label key={participant.id} className="tag tag--choice" style={{ cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  style={{ width: '1.1rem', height: '1.1rem', minHeight: 0, marginRight: '0.4rem' }}
+                  checked={form.participantIds.includes(participant.id)}
+                  onChange={() => toggleParticipant(participant.id)}
+                />
+                {participant.name}
+                {!participant.ownCapela && participant.capelaName ? ` (${participant.capelaName})` : ''}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
+
       {message && <p className="error">{message}</p>}
 
       <button className="btn" type="submit" disabled={busy}>
-        {busy ? 'Salvando…' : editando ? 'Salvar alterações' : 'Criar celebração'}
+        {busy ? 'Salvando…' : editando ? 'Salvar alterações' : 'Criar evento'}
       </button>
     </form>
   );

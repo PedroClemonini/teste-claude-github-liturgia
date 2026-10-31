@@ -19,7 +19,8 @@ const SUGESTOES = [
   'Percussão',
 ];
 
-export function RegisterForm() {
+/** @param {{inviteToken: string}} props */
+export function RegisterForm({ inviteToken }) {
   const router = useRouter();
   const [form, setForm] = useState(VAZIO);
   const [errors, setErrors] = useState({});
@@ -37,7 +38,7 @@ export function RegisterForm() {
     const response = await fetch('/api/register', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ ...form, inviteToken }),
     });
     const body = await response.json().catch(() => ({}));
 
@@ -100,13 +101,15 @@ export function RegisterForm() {
         {errors.voiceOrInstrument && <p className="error">{errors.voiceOrInstrument}</p>}
       </label>
 
+      {errors.inviteToken && <p className="error">{errors.inviteToken}</p>}
       {message && <p className="error">{message}</p>}
 
       <button className="btn" type="submit" disabled={busy}>
         {busy ? 'Cadastrando…' : 'Criar conta'}
       </button>
       <p style={{ fontSize: '0.8rem', color: 'var(--text-soft)', marginTop: '0.6rem' }}>
-        Novas contas entram como Músico. Um coordenador pode promover integrantes na tela Equipe.
+        Você vai entrar como Músico na capela que te convidou. Um coordenador
+        pode promover integrantes na tela Equipe.
       </p>
     </form>
   );

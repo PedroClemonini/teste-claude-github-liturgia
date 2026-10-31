@@ -7,7 +7,10 @@ vi.mock('@/lib/session.js', () => ({
   currentUser: async () => session.user,
 }));
 
-const { prisma, resetDatabase, makeCoordinator, makeMusician } = await import('../helpers/db.js');
+const { prisma, resetDatabase, makeCapela, makeCoordinator, makeMusician, makeAdministrator } = await import(
+  '../helpers/db.js'
+);
+const { createInvite } = await import('@/services/invites.js');
 const registerRoute = await import('@/app/api/register/route.js');
 const songsRoute = await import('@/app/api/songs/route.js');
 const songRoute = await import('@/app/api/songs/[id]/route.js');
@@ -16,7 +19,12 @@ const celebrationRoute = await import('@/app/api/celebrations/[id]/route.js');
 const repertoireRoute = await import('@/app/api/celebrations/[id]/repertoire/route.js');
 const scriptRoute = await import('@/app/api/celebrations/[id]/script/route.js');
 const membersRoute = await import('@/app/api/members/route.js');
+const memberRoute = await import('@/app/api/members/[id]/route.js');
 const memberRoleRoute = await import('@/app/api/members/[id]/role/route.js');
+const memberCapelaRoute = await import('@/app/api/members/[id]/capela/route.js');
+const capelasRoute = await import('@/app/api/capelas/route.js');
+const invitesRoute = await import('@/app/api/invites/route.js');
+const inviteRoute = await import('@/app/api/invites/[id]/route.js');
 
 const post = (body) =>
   new Request('http://localhost/api', {
@@ -29,13 +37,15 @@ const get = (url = 'http://localhost/api') => new Request(url);
 const del = () => new Request('http://localhost/api', { method: 'DELETE' });
 const params = (id) => ({ params: Promise.resolve({ id }) });
 
+let capela;
 let coordenador;
 let musico;
 
 beforeEach(async () => {
   await resetDatabase();
-  coordenador = await makeCoordinator();
-  musico = await makeMusician();
+  capela = await makeCapela();
+  coordenador = await makeCoordinator({ capelaId: capela.id });
+  musico = await makeMusician({ capelaId: capela.id });
   session.user = null;
 });
 afterAll(async () => {
@@ -44,18 +54,24 @@ afterAll(async () => {
 });
 
 describe('POST /api/register', () => {
-  it('cadastra um novo integrante', async () => {
+  it('cadastra um novo integrante na capela do convite', async () => {
+    const invite = await createInvite(capela.id, coordenador);
     const response = await registerRoute.POST(
       post({
         name: 'Maria Soprano',
         email: 'maria@paroquia.org',
         password: 'salmo23aleluia',
         voiceOrInstrument: 'Soprano',
+        inviteToken: invite.token,
       }),
     );
     expect(response.status).toBe(201);
     const body = await response.json();
-    expect(body.user).toMatchObject({ email: 'maria@paroquia.org', role: 'MUSICO' });
+    expect(body.user).toMatchObject({
+      email: 'maria@paroquia.org',
+      role: 'MUSICO',
+      capelaId: capela.id,
+    });
     expect(body.user.passwordHash).toBeUndefined();
   });
 
@@ -67,6 +83,19 @@ describe('POST /api/register', () => {
     expect(body.details.password).toBeTruthy();
   });
 
+  it('devolve 422 sem convite', async () => {
+    const response = await registerRoute.POST(
+      post({
+        name: 'Maria Soprano',
+        email: 'maria@paroquia.org',
+        password: 'salmo23aleluia',
+        voiceOrInstrument: 'Soprano',
+      }),
+    );
+    expect(response.status).toBe(422);
+    expect((await response.json()).details.inviteToken).toBeTruthy();
+  });
+
   it('devolve 409 para e-mail repetido', async () => {
     const payload = {
       name: 'Maria Soprano',
@@ -74,12 +103,16 @@ describe('POST /api/register', () => {
       password: 'salmo23aleluia',
       voiceOrInstrument: 'Soprano',
     };
-    await registerRoute.POST(post(payload));
-    const response = await registerRoute.POST(post(payload));
+    const invite1 = await createInvite(capela.id, coordenador);
+    await registerRoute.POST(post({ ...payload, inviteToken: invite1.token }));
+
+    const invite2 = await createInvite(capela.id, coordenador);
+    const response = await registerRoute.POST(post({ ...payload, inviteToken: invite2.token }));
     expect(response.status).toBe(409);
   });
 
-  it('não deixa o cadastro público criar um coordenador', async () => {
+  it('não deixa o cadastro por convite criar um coordenador', async () => {
+    const invite = await createInvite(capela.id, coordenador);
     const response = await registerRoute.POST(
       post({
         name: 'Espertinho',
@@ -87,6 +120,7 @@ describe('POST /api/register', () => {
         password: 'salmo23aleluia',
         voiceOrInstrument: 'Baixo',
         role: 'COORDENADOR',
+        inviteToken: invite.token,
       }),
     );
     expect(response.status).toBe(201);
@@ -98,6 +132,92 @@ describe('POST /api/register', () => {
       new Request('http://localhost/api', { method: 'POST', body: 'nada disso' }),
     );
     expect(response.status).toBe(400);
+  });
+});
+
+describe('/api/capelas', () => {
+  it('permite ao administrador fundar uma capela', async () => {
+    const admin = await makeAdministrator();
+    session.user = admin;
+    const response = await capelasRoute.POST(post({ name: 'Capela Nova' }));
+    expect(response.status).toBe(201);
+    const body = await response.json();
+    expect(body.capela).toMatchObject({ name: 'Capela Nova', createdById: admin.id });
+  });
+
+  it('impede o coordenador e o músico de fundar capela', async () => {
+    session.user = coordenador;
+    expect((await capelasRoute.POST(post({ name: 'Capela Nova' }))).status).toBe(403);
+
+    session.user = musico;
+    expect((await capelasRoute.POST(post({ name: 'Capela Nova' }))).status).toBe(403);
+  });
+
+  it('coordenador lista só a própria capela; administrador lista todas', async () => {
+    const admin = await makeAdministrator();
+    session.user = admin;
+    await capelasRoute.POST(post({ name: 'Capela Nova' }));
+
+    const doCoordenador = await (async () => {
+      session.user = coordenador;
+      return (await capelasRoute.GET()).json();
+    })();
+    expect(doCoordenador.capelas.map((c) => c.name)).toEqual([capela.name]);
+
+    session.user = admin;
+    const doAdmin = await (await capelasRoute.GET()).json();
+    expect(doAdmin.capelas.map((c) => c.name).sort()).toEqual(['Capela Nova', capela.name].sort());
+  });
+});
+
+describe('/api/invites', () => {
+  it('gera e lista um convite para a capela do coordenador', async () => {
+    session.user = coordenador;
+    const response = await invitesRoute.POST(post({ capelaId: capela.id }));
+    expect(response.status).toBe(201);
+    const { invite } = await response.json();
+    expect(invite.capelaId).toBe(capela.id);
+
+    const listed = await (
+      await invitesRoute.GET(get(`http://localhost/api/invites?capelaId=${capela.id}`))
+    ).json();
+    expect(listed.invites.map((i) => i.id)).toContain(invite.id);
+  });
+
+  it('revoga um convite pendente', async () => {
+    session.user = coordenador;
+    const { invite } = await (await invitesRoute.POST(post({ capelaId: capela.id }))).json();
+
+    expect((await inviteRoute.DELETE(del(), params(invite.id))).status).toBe(200);
+
+    const listed = await (
+      await invitesRoute.GET(get(`http://localhost/api/invites?capelaId=${capela.id}`))
+    ).json();
+    expect(listed.invites.map((i) => i.id)).not.toContain(invite.id);
+  });
+
+  it('coordenador de outra capela não cria nem lista convites alheios', async () => {
+    const outraCapela = await makeCapela({ name: 'Outra paróquia' });
+    session.user = await makeCoordinator({ capelaId: outraCapela.id });
+
+    expect((await invitesRoute.POST(post({ capelaId: capela.id }))).status).toBe(403);
+    expect(
+      (await invitesRoute.GET(get(`http://localhost/api/invites?capelaId=${capela.id}`))).status,
+    ).toBe(403);
+  });
+
+  it('músico não gera convite', async () => {
+    session.user = musico;
+    expect((await invitesRoute.POST(post({ capelaId: capela.id }))).status).toBe(403);
+  });
+
+  it('administrador gera convite para uma capela que acabou de fundar', async () => {
+    const admin = await makeAdministrator();
+    session.user = admin;
+    const nova = await (await capelasRoute.POST(post({ name: 'Capela Nova' }))).json();
+
+    const response = await invitesRoute.POST(post({ capelaId: nova.capela.id }));
+    expect(response.status).toBe(201);
   });
 });
 
@@ -173,7 +293,7 @@ describe('/api/songs', () => {
 });
 
 describe('/api/celebrations', () => {
-  it('cria a celebração deduzindo o tempo litúrgico', async () => {
+  it('cria a evento deduzindo o tempo litúrgico', async () => {
     session.user = coordenador;
     const response = await celebrationsRoute.POST(
       post({ title: 'Missa da Páscoa', date: '2026-04-05T10:00:00.000Z', type: 'MISSA_SOLENE' }),
@@ -212,6 +332,29 @@ describe('/api/celebrations', () => {
     expect(response.status).toBe(422);
     expect((await response.json()).details.date).toBeTruthy();
   });
+
+  it('coordenador vê (mas não mexe em) evento de outra capela; músico nem vê', async () => {
+    session.user = coordenador;
+    const { celebration } = await (
+      await celebrationsRoute.POST(post({ title: 'Missa', date: '2026-04-05T10:00:00.000Z' }))
+    ).json();
+
+    const outraCapela = await makeCapela({ name: 'Outra paróquia' });
+    session.user = await makeCoordinator({ capelaId: outraCapela.id });
+
+    expect((await celebrationRoute.GET(get(), params(celebration.id))).status).toBe(200);
+    expect(
+      (
+        await celebrationRoute.PUT(
+          put({ title: 'X', date: '2026-04-05T10:00:00.000Z' }),
+          params(celebration.id),
+        )
+      ).status,
+    ).toBe(403);
+
+    session.user = await makeMusician({ capelaId: outraCapela.id });
+    expect((await celebrationRoute.GET(get(), params(celebration.id))).status).toBe(404);
+  });
 });
 
 describe('/api/celebrations/[id]/repertoire e /script', () => {
@@ -243,7 +386,7 @@ describe('/api/celebrations/[id]/repertoire e /script', () => {
     expect(body.repertoire[0]).toMatchObject({ moment: 'ENTRADA', keyOverride: 'A' });
   });
 
-  it('entrega ao músico o roteiro já transposto para o tom da celebração', async () => {
+  it('entrega ao músico o roteiro já transposto para o tom da evento', async () => {
     await repertoireRoute.PUT(
       put({ items: [{ songId, moment: 'ENTRADA', keyOverride: 'A' }] }),
       params(celebrationId),
@@ -265,7 +408,7 @@ describe('/api/celebrations/[id]/repertoire e /script', () => {
     expect(response.status).toBe(403);
   });
 
-  it('devolve 404 quando a celebração não existe', async () => {
+  it('devolve 404 quando a evento não existe', async () => {
     const response = await repertoireRoute.PUT(put({ items: [] }), params('inexistente'));
     expect(response.status).toBe(404);
   });
@@ -317,5 +460,74 @@ describe('/api/members', () => {
     session.user = coordenador;
     const response = await memberRoleRoute.PATCH(patch({ role: 'BISPO' }), params(musico.id));
     expect(response.status).toBe(422);
+  });
+
+  it('coordenador remove um integrante da própria capela', async () => {
+    session.user = coordenador;
+    const response = await memberRoute.DELETE(del(), params(musico.id));
+    expect(response.status).toBe(200);
+  });
+
+  it('coordenador não remove integrante de outra capela', async () => {
+    const outraCapela = await makeCapela({ name: 'Outra paróquia' });
+    const musicoDeFora = await makeMusician({ capelaId: outraCapela.id });
+
+    session.user = coordenador;
+    expect((await memberRoute.DELETE(del(), params(musicoDeFora.id))).status).toBe(403);
+  });
+
+  it('administrador remove integrante de qualquer capela', async () => {
+    session.user = await makeAdministrator();
+    expect((await memberRoute.DELETE(del(), params(musico.id))).status).toBe(200);
+  });
+
+  it('músico não remove ninguém', async () => {
+    session.user = musico;
+    expect((await memberRoute.DELETE(del(), params(coordenador.id))).status).toBe(403);
+  });
+
+  it('administrador edita nome, e-mail, voz, capela e papel de um integrante', async () => {
+    session.user = await makeAdministrator();
+    const response = await memberRoute.PATCH(
+      patch({
+        name: 'Editado',
+        email: 'editado@paroquia.org',
+        voiceOrInstrument: 'Contralto',
+        capelaId: capela.id,
+        role: 'COORDENADOR',
+      }),
+      params(musico.id),
+    );
+    expect(response.status).toBe(200);
+    expect((await response.json()).user).toMatchObject({ name: 'Editado', role: 'COORDENADOR' });
+  });
+
+  it('coordenador não usa a edição completa', async () => {
+    session.user = coordenador;
+    const response = await memberRoute.PATCH(
+      patch({
+        name: 'X',
+        email: 'x@paroquia.org',
+        voiceOrInstrument: 'X',
+        capelaId: capela.id,
+        role: 'MUSICO',
+      }),
+      params(musico.id),
+    );
+    expect(response.status).toBe(403);
+  });
+
+  it('administrador move um integrante para outra capela', async () => {
+    const outraCapela = await makeCapela({ name: 'Outra paróquia' });
+    session.user = await makeAdministrator();
+    const response = await memberCapelaRoute.PATCH(patch({ capelaId: outraCapela.id }), params(musico.id));
+    expect(response.status).toBe(200);
+    expect((await response.json()).user.capelaId).toBe(outraCapela.id);
+  });
+
+  it('coordenador não move ninguém de capela', async () => {
+    session.user = coordenador;
+    const response = await memberCapelaRoute.PATCH(patch({ capelaId: capela.id }), params(musico.id));
+    expect(response.status).toBe(403);
   });
 });

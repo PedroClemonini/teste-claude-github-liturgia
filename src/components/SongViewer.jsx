@@ -4,13 +4,20 @@
  * Tela do músico: cifra grande, transposição em um clique e modo somente letra
  * para quem canta sem instrumento.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ChordSheet } from './ChordSheet.jsx';
 import {
   keyPrefersFlats,
   semitonesBetween,
   transposeKey,
 } from '@/domain/chordpro/transpose.js';
+
+// Preferência de leitura, não da música: vale para toda cifra que o músico
+// abrir, por isso fica salva no aparelho em vez de junto do offset de tom.
+const FONT_SCALE_STORAGE_KEY = 'cifra-font-scale';
+const FONT_SCALE_MIN = 0.85;
+const FONT_SCALE_MAX = 1.6;
+const FONT_SCALE_STEP = 0.15;
 
 /**
  * @param {{
@@ -28,10 +35,26 @@ export function SongViewer({
   // na linha que se abre — repeti-los só empurraria a cifra para baixo.
   variant = 'full',
 }) {
-  // Ponto de partida: o tom definido para a celebração ou o tom original.
+  // Ponto de partida: o tom definido para a evento ou o tom original.
   const baseOffset = performanceKey ? semitonesBetween(song.originalKey, performanceKey) : 0;
   const [offset, setOffset] = useState(baseOffset);
   const [showChords, setShowChords] = useState(true);
+  const [fontScale, setFontScale] = useState(1);
+
+  useEffect(() => {
+    const saved = Number(window.localStorage.getItem(FONT_SCALE_STORAGE_KEY));
+    if (saved >= FONT_SCALE_MIN && saved <= FONT_SCALE_MAX) {
+      setFontScale(saved);
+    }
+  }, []);
+
+  const changeFontScale = (delta) => {
+    setFontScale((value) => {
+      const next = Math.min(FONT_SCALE_MAX, Math.max(FONT_SCALE_MIN, Math.round((value + delta) * 100) / 100));
+      window.localStorage.setItem(FONT_SCALE_STORAGE_KEY, String(next));
+      return next;
+    });
+  };
 
   const currentKey = useMemo(() => {
     // Ao descer o tom, a grafia com bemóis é a que os músicos leem melhor.
@@ -85,7 +108,7 @@ export function SongViewer({
           className="btn btn--ghost"
           onClick={() => setOffset(baseOffset)}
           disabled={!changed}
-          aria-label={performanceKey ? 'Voltar ao tom da celebração' : 'Voltar ao tom original'}
+          aria-label={performanceKey ? 'Voltar ao tom da evento' : 'Voltar ao tom original'}
         >
           Voltar
         </button>
@@ -97,6 +120,27 @@ export function SongViewer({
         >
           {showChords ? 'Somente letra' : 'Mostrar cifra'}
         </button>
+
+        <div className="viewer-font-controls" role="group" aria-label="Tamanho da letra">
+          <button
+            type="button"
+            className="btn btn--round btn--round--label"
+            onClick={() => changeFontScale(-FONT_SCALE_STEP)}
+            disabled={fontScale <= FONT_SCALE_MIN}
+            aria-label="Diminuir tamanho da letra"
+          >
+            A−
+          </button>
+          <button
+            type="button"
+            className="btn btn--round btn--round--label"
+            onClick={() => changeFontScale(FONT_SCALE_STEP)}
+            disabled={fontScale >= FONT_SCALE_MAX}
+            aria-label="Aumentar tamanho da letra"
+          >
+            A+
+          </button>
+        </div>
       </div>
 
       <ChordSheet
@@ -104,6 +148,7 @@ export function SongViewer({
         semitones={offset}
         targetKey={currentKey}
         showChords={showChords}
+        fontScale={fontScale}
       />
     </article>
   );

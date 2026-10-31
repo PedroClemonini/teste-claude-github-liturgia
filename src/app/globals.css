@@ -1,7 +1,7 @@
 /*
  * Base visual do sistema.
  *
- * A prioridade é a leitura no celular durante a celebração: contraste alto,
+ * A prioridade é a leitura no celular durante a evento: contraste alto,
  * tipografia grande na cifra e nenhuma rolagem horizontal. Tudo é escrito
  * primeiro para telas estreitas; as consultas de mídia acrescentam colunas
  * quando há espaço.
@@ -95,13 +95,20 @@ h3 {
 }
 
 .brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   font-weight: 700;
   color: var(--accent);
   font-size: 1.05rem;
   margin-right: auto;
 }
 
-.brand span {
+.brand-logo {
+  flex-shrink: 0;
+}
+
+.brand-sub {
   display: block;
   font-size: 0.72rem;
   font-weight: 500;
@@ -161,6 +168,16 @@ h3 {
     order: 2;
     width: auto;
   }
+  .who {
+    order: 3;
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    text-align: left;
+  }
+  .who strong {
+    display: inline;
+  }
   .main {
     padding: 1.5rem 1.5rem 4rem;
   }
@@ -174,6 +191,24 @@ h3 {
   border-radius: var(--radius);
   padding: 1rem;
   box-shadow: var(--shadow);
+}
+
+.video-embed {
+  position: relative;
+  width: 100%;
+  max-width: 640px;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #000;
+}
+
+.video-embed iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
 }
 
 .page-head {
@@ -232,10 +267,18 @@ h3 {
 }
 
 .btn--small {
-  min-height: 32px;
-  padding: 0.15rem 0.6rem;
+  min-height: 36px;
+  padding: 0.3rem 0.7rem;
   font-size: 0.8rem;
   margin-top: 0.25rem;
+}
+
+/* Filtros de capela: mais discretos que um <select> de formulário, mas
+   ainda com alvo de toque razoável — nunca 'auto' (fica minúsculo no celular). */
+.select--compact {
+  min-height: 40px;
+  width: auto;
+  padding: 0.4rem 0.6rem;
 }
 
 .btn--round {
@@ -244,6 +287,12 @@ h3 {
   padding: 0;
   font-size: 1.4rem;
   border-radius: 999px;
+}
+
+/* Rótulo de duas letras (A−/A+) não cabe no tamanho de fonte do +/- de tom. */
+.btn--round--label {
+  font-size: 0.95rem;
+  font-weight: 700;
 }
 
 .tag {
@@ -273,6 +322,16 @@ h3 {
   background: #fdeee6;
   border-color: #edc4ad;
   color: var(--chord);
+}
+
+/* Tag usada como rótulo clicável (checkbox de participante): a etiqueta
+   normal é pequena demais pra tocar com conforto no celular. */
+.tag--choice {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0.3rem 0.8rem 0.3rem 0.6rem;
+  font-size: 0.85rem;
 }
 
 .field {
@@ -319,6 +378,43 @@ a:focus-visible {
   margin: 0.2rem 0 0;
 }
 
+.success {
+  color: var(--ok);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin: 0.2rem 0 0;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(33, 32, 29, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 100;
+}
+
+.modal {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.2rem;
+  width: 100%;
+  max-width: 30rem;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.8rem;
+}
+
 .notice {
   background: var(--accent-soft);
   border: 1px solid #e2cfdd;
@@ -363,6 +459,7 @@ a:focus-visible {
 
 .calendar-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
   margin-bottom: 0.75rem;
@@ -398,9 +495,12 @@ a:focus-visible {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 6px;
-  min-height: 5.5rem;
+  height: 5.5rem;
   padding: 0.3rem;
   font-size: 0.8rem;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .calendar-day--out {
@@ -419,6 +519,22 @@ a:focus-visible {
   gap: 0.25rem;
   font-weight: 600;
   margin-bottom: 0.2rem;
+  flex-shrink: 0;
+}
+
+.calendar-day-events {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Muitos cantos no mesmo dia: encolhe o texto pra caber mais, em vez de
+   estourar o tile (que tem altura fixa) ou cortar tudo sem aviso. */
+.calendar-day-events--compact .calendar-event {
+  font-size: 0.6rem;
+  padding: 0.1rem 0.25rem;
+  margin-bottom: 1px;
 }
 
 .season-dot {
@@ -620,14 +736,17 @@ a:focus-visible {
   color: var(--text-soft);
 }
 
-/* Os controles de tom ficam sempre alcançáveis pelo polegar. */
+/* Os controles de tom ficam sempre alcançáveis pelo polegar. Este valor tem
+   uma folga proposital sobre a altura real do cabeçalho (~62-68px): melhor
+   sobrar uma faixa de fundo do que os controles ficarem escondidos atrás
+   do cabeçalho fixo. */
 .viewer-controls {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
   position: sticky;
-  top: 3.4rem;
+  top: 4rem;
   z-index: 5;
   background: var(--bg);
   padding: 0.5rem 0;
@@ -651,6 +770,118 @@ a:focus-visible {
   font-size: 0.65rem;
   text-transform: uppercase;
   color: var(--text-soft);
+}
+
+.viewer-font-controls {
+  display: flex;
+  gap: 0.4rem;
+  margin-left: auto;
+}
+
+/* ---------- Modo missa ---------- */
+
+/* Sobreposição própria em vez de confiar só na API de tela cheia: no iPhone
+   ela não existe, e mesmo assim o músico precisa da tela limpa. */
+.performance {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+}
+
+.performance-bar,
+.performance-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 0.9rem;
+  background: var(--surface);
+}
+
+.performance-bar {
+  border-bottom: 1px solid var(--border);
+}
+
+/* Título longo empurra, mas não espreme os botões: são eles o alvo de toque. */
+.performance-bar .btn {
+  flex-shrink: 0;
+}
+
+.performance-moment {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+}
+
+.performance-title {
+  margin: 0;
+  font-size: 1.15rem;
+  line-height: 1.2;
+}
+
+.performance-body {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 0.9rem;
+}
+
+/* Aqui não há cabeçalho fixo do site: os controles de tom grudam no alto da
+   própria área que rola. */
+.performance .viewer-controls {
+  top: 0;
+}
+
+/* Duas colunas cortam pela metade a rolagem de uma música longa, mas só valem
+   onde há largura: no celular em pé, o botão some e a cifra segue em coluna
+   única — inclusive se o aparelho for girado de volta com o modo ligado. */
+.performance-columns {
+  display: none;
+}
+
+@media (min-width: 700px) {
+  .performance-columns {
+    display: inline-flex;
+  }
+
+  .performance--colunas .sheet {
+    column-count: 2;
+    column-gap: 2rem;
+    column-rule: 1px solid var(--border);
+  }
+
+  /* Acorde e sílaba vivem na mesma linha: parti-la entre colunas deixaria o
+     acorde órfão no pé de uma e a letra no alto da outra. */
+  .performance--colunas .sheet-line,
+  .performance--colunas .sheet-comment {
+    break-inside: avoid;
+  }
+}
+
+.performance-nav {
+  justify-content: space-between;
+  border-top: 1px solid var(--border);
+}
+
+/* Alvo largo: passa-se de canto com o polegar, sem olhar. */
+.performance-nav .btn {
+  flex: 1;
+  min-height: 52px;
+}
+
+.performance-count {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-soft);
+  white-space: nowrap;
 }
 
 /* ---------- Editor dividido ---------- */
@@ -850,14 +1081,156 @@ a:focus-visible {
   overflow-x: auto;
 }
 
+/* ---------- Menu mobile ---------- */
+
+.menu-toggle {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+  order: 2;
+}
+
+.menu-toggle span {
+  display: block;
+  width: 24px;
+  height: 2px;
+  background: var(--text);
+  border-radius: 2px;
+}
+
+.mobile-menu-backdrop {
+  display: none;
+}
+
+@media (max-width: 719px) {
+  .topbar-inner {
+    position: relative;
+  }
+
+  /* O mote é decorativo; some no celular pra manter o cabeçalho baixo e
+     previsível (a tela de cifra depende disso pra calcular o sticky). */
+  .brand-sub {
+    display: none;
+  }
+
+  .menu-toggle {
+    display: flex;
+  }
+
+  .mobile-menu {
+    display: none;
+    position: fixed;
+    top: 4rem;
+    left: 0;
+    right: 0;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0.5rem 0 0.75rem;
+    z-index: 50;
+    max-height: calc(100vh - 4rem);
+    overflow-y: auto;
+  }
+
+  .mobile-menu.is-open {
+    display: block;
+  }
+
+  .mobile-menu-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(33, 32, 29, 0.3);
+    z-index: 49;
+    top: 4rem;
+  }
+
+  .nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .nav a {
+    width: 100%;
+    padding: 0.85rem 1rem;
+    min-height: 44px;
+    border-radius: 0;
+    font-size: 1rem;
+  }
+
+  .mobile-menu .who {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    text-align: left;
+    padding: 0.85rem 1rem 0.25rem;
+    margin-top: 0.25rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .mobile-menu .who strong {
+    display: block;
+  }
+
+  .mobile-menu .who form {
+    flex-shrink: 0;
+  }
+
+  .mobile-menu .who .btn--small {
+    min-height: 40px;
+    padding: 0.4rem 0.9rem;
+    font-size: 0.85rem;
+    margin-top: 0;
+  }
+}
+
+@media (min-width: 720px) {
+  .mobile-menu {
+    display: contents;
+  }
+
+  .mobile-menu-backdrop {
+    display: none !important;
+  }
+}
+
 @media print {
   .topbar,
   .footer,
   .viewer-controls,
+  .video-embed,
   .btn {
     display: none !important;
   }
   body {
     background: #fff;
+  }
+
+  .script-item {
+    border: none;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .script-item > summary {
+    list-style: none;
+  }
+
+  .script-item > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .script-item a {
+    display: none;
   }
 }

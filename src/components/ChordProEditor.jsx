@@ -52,7 +52,7 @@ export function ChordProEditor({ value, onChange }) {
 
       <div className="editor-pane">
         <p className="editor-label">Pré-visualização</p>
-        <p className="editor-hint">É exatamente assim que o músico vai ler na celebração.</p>
+        <p className="editor-hint">É exatamente assim que o músico vai ler na evento.</p>
         <div className="editor-preview" data-testid="preview">
           <ChordSheet chordPro={value} />
         </div>

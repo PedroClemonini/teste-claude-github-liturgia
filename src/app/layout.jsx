@@ -1,11 +1,13 @@
 import './globals.css';
 import Link from 'next/link';
 import { currentUser } from '@/lib/session.js';
-import { signOut } from '@/lib/auth.js';
-import { roleLabel } from '@/domain/auth/roles.js';
+import { roleLabel, isAdministrator } from '@/domain/auth/roles.js';
+import Image from 'next/image';
+import { HeaderContent } from '@/components/HeaderContent.jsx';
+import { signOutAction } from './actions.js';
 
 export const metadata = {
-  title: 'Coral Litúrgico',
+  title: 'Santa Liturgia - SFX',
   description: 'Calendário, escalas e cifras para corais católicos.',
 };
 
@@ -25,39 +27,26 @@ export default async function RootLayout({ children }) {
           <header className="topbar">
             <div className="topbar-inner">
               <Link href="/" className="brand">
-                Coral Litúrgico
-                <span>calendário, escalas e cifras</span>
+                <Image
+                  src="/sfx.png"
+                  alt="logo"
+                  width={36}
+                  height={36}
+                  className="brand-logo"
+                  style={{ objectFit: 'contain' }}
+                />
+                <span>
+                  Santa Liturgia - São Francisco Xavier
+                  <span className="brand-sub">"Ide pelo mundo e anunciai o evangelho a toda criatura"</span>
+                </span>
               </Link>
 
-              {user ? (
-                <>
-                  <nav className="nav" aria-label="Seções">
-                    <Link href="/agenda">Agenda</Link>
-                    <Link href="/acervo">Acervo</Link>
-                    <Link href="/equipe">Equipe</Link>
-                  </nav>
-                  <div className="who">
-                    <strong>{user.name}</strong>
-                    {roleLabel(user.role)}
-                    {user.voiceOrInstrument ? ` · ${user.voiceOrInstrument}` : ''}
-                    <form
-                      action={async () => {
-                        'use server';
-                        await signOut({ redirectTo: '/entrar' });
-                      }}
-                    >
-                      <button type="submit" className="btn btn--ghost btn--small">
-                        Sair
-                      </button>
-                    </form>
-                  </div>
-                </>
-              ) : (
-                <nav className="nav" aria-label="Acesso">
-                  <Link href="/entrar">Entrar</Link>
-                  <Link href="/cadastro">Criar conta</Link>
-                </nav>
-              )}
+              <HeaderContent
+                user={user}
+                signOutAction={signOutAction}
+                isAdmin={user ? isAdministrator(user) : false}
+                roleLabel={user ? roleLabel(user.role) : null}
+              />
             </div>
           </header>
 

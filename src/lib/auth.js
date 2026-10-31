@@ -34,6 +34,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           email: user.email,
           role: user.role,
           voiceOrInstrument: user.voiceOrInstrument,
+          capelaId: user.capelaId,
         };
       },
     }),
@@ -43,6 +44,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         token.role = user.role;
         token.voiceOrInstrument = user.voiceOrInstrument;
+        token.capelaId = user.capelaId;
       }
       return token;
     },
@@ -50,6 +52,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.user.id = token.sub;
       session.user.role = token.role;
       session.user.voiceOrInstrument = token.voiceOrInstrument;
+      session.user.capelaId = token.capelaId;
       return session;
     },
   },

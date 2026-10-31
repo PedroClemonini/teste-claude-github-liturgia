@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterAll } from 'vitest';
-import { prisma, resetDatabase, makeCoordinator, makeMusician } from '../helpers/db.js';
+import { prisma, resetDatabase, makeCapela, makeCoordinator, makeMusician } from '../helpers/db.js';
 import { createSong, updateSong, getSong, searchSongs, deleteSong } from '@/services/songs.js';
 import { createCelebration } from '@/services/celebrations.js';
 import { setRepertoire } from '@/services/repertoire.js';
@@ -9,8 +9,9 @@ let musico;
 
 beforeEach(async () => {
   await resetDatabase();
-  coordenador = await makeCoordinator();
-  musico = await makeMusician();
+  const capela = await makeCapela();
+  coordenador = await makeCoordinator({ capelaId: capela.id });
+  musico = await makeMusician({ capelaId: capela.id });
 });
 afterAll(async () => {
   await resetDatabase();
@@ -129,7 +130,7 @@ describe('searchSongs', () => {
 
   it('filtra por tempo litúrgico, mantendo as músicas para qualquer tempo', async () => {
     const songs = await searchSongs({ season: 'NATAL' });
-    // "Pai Nosso" não tem tempo definido, logo serve em qualquer celebração.
+    // "Pai Nosso" não tem tempo definido, logo serve em qualquer evento.
     expect(songs.map((s) => s.title)).toEqual(['Noite Feliz', 'Pai Nosso']);
   });
 

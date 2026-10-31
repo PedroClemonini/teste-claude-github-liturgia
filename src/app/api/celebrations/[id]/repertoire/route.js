@@ -13,7 +13,7 @@ export async function GET(request, { params }) {
   });
 }
 
-/** Salva o roteiro musical inteiro da celebração. */
+/** Salva o roteiro musical inteiro da evento. */
 export async function PUT(request, { params }) {
   return handle(async () => {
     const actor = await currentUser();

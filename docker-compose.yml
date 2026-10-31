@@ -1,0 +1,96 @@
+services:
+  # ---- Dev: banco e app com os dados já acumulados (contas, capelas,
+  # celebrações reais) — segue na porta 3001, sem tocar nesses dados. ----
+  db-dev:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: coral_dev
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db-dev:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db-dev:5432/coral_dev?schema=public
+      AUTH_SECRET: ${AUTH_SECRET:-troque-este-valor}
+      NEXTAUTH_URL: ${DEV_URL:-http://localhost:3001}
+      APP_URL: ${DEV_URL:-http://localhost:3001}
+      NODE_ENV: production
+      SEED_DB: "false"
+      # Envio de e-mail (recuperação de senha). Sem SMTP_PASSWORD, o link de
+      # redefinição vai para o log do container em vez do e-mail da pessoa.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_SECURE: ${SMTP_SECURE:-}
+      MAIL_FROM: ${MAIL_FROM:-Coral Litúrgico <suporte@paroquiasfranciscoxavier.com.br>}
+    ports:
+      - "3001:3000"
+
+  # ---- Produção: banco novo e limpo, exposto em coral.gruhackerspace.com.br
+  # via cloudflared (o túnel roda fora deste compose). ----
+  db-prod:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: coral_prod
+    volumes:
+      - db_prod_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app-prod:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db-prod:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db-prod:5432/coral_prod?schema=public
+      AUTH_SECRET: ${AUTH_SECRET:-troque-este-valor}
+      NEXTAUTH_URL: ${PROD_URL:-https://paroquiasfranciscoxavier.com.br}
+      APP_URL: ${PROD_URL:-https://paroquiasfranciscoxavier.com.br}
+      # Envio de e-mail (recuperação de senha). Sem SMTP_PASSWORD, o link de
+      # redefinição vai para o log do container em vez do e-mail da pessoa.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_SECURE: ${SMTP_SECURE:-}
+      MAIL_FROM: ${MAIL_FROM:-Coral Litúrgico <suporte@paroquiasfranciscoxavier.com.br>}
+      NODE_ENV: production
+      # Fica em "false" por padrão de propósito: como o seed apaga tudo antes
+      # de recriar, deixar "true" aqui faria cada restart devolver o banco ao
+      # estado inicial, jogando fora cadastros reais feitos depois do seed.
+      # Rode a semeadura manualmente uma vez (veja o README) e deixe assim.
+      SEED_DB: "false"
+    ports:
+      - "${APP_PORT:-3000}:3000"
+
+volumes:
+  db_data:
+  db_prod_data:

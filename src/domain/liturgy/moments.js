@@ -1,6 +1,6 @@
 /**
  * Momentos do rito aos quais o roteiro musical associa cada canto.
- * A ordem da lista é a ordem em que os cantos acontecem na celebração.
+ * A ordem da lista é a ordem em que os cantos acontecem na evento.
  */
 
 export const LITURGICAL_MOMENTS = [
@@ -11,6 +11,9 @@ export const LITURGICAL_MOMENTS = [
   { id: 'ACLAMACAO', label: 'Aclamação' },
   { id: 'OFERTORIO', label: 'Ofertório' },
   { id: 'SANTO', label: 'Santo' },
+  { id: 'ORACAO_EUCARISTICA', label: 'Oração Eucarística' },
+  { id: 'MISTERIO_DA_FE', label: 'Mistério da Fé' },
+  { id: 'GRANDE_AMEM', label: 'Grande Amém' },
   { id: 'CORDEIRO', label: 'Cordeiro' },
   { id: 'COMUNHAO', label: 'Comunhão' },
   { id: 'ACAO_DE_GRACAS', label: 'Ação de Graças' },

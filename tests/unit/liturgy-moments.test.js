@@ -9,7 +9,7 @@ import {
 } from '@/domain/liturgy/moments.js';
 
 describe('catálogo de momentos', () => {
-  it('cobre os onze momentos do rito na ordem da celebração', () => {
+  it('cobre os catorze momentos do rito na ordem da evento', () => {
     expect(LITURGICAL_MOMENTS.map((m) => m.id)).toEqual([
       'ENTRADA',
       'ATO_PENITENCIAL',
@@ -18,6 +18,9 @@ describe('catálogo de momentos', () => {
       'ACLAMACAO',
       'OFERTORIO',
       'SANTO',
+      'ORACAO_EUCARISTICA',
+      'MISTERIO_DA_FE',
+      'GRANDE_AMEM',
       'CORDEIRO',
       'COMUNHAO',
       'ACAO_DE_GRACAS',
@@ -65,6 +68,6 @@ describe('missingMoments', () => {
     const missing = missingMoments(items);
     expect(missing).not.toContain('ENTRADA');
     expect(missing).toContain('SALMO');
-    expect(missing).toHaveLength(9);
+    expect(missing).toHaveLength(12);
   });
 });

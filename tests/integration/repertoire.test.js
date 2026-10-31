@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterAll } from 'vitest';
-import { prisma, resetDatabase, makeCoordinator, makeMusician } from '../helpers/db.js';
+import { prisma, resetDatabase, makeCapela, makeCoordinator, makeMusician } from '../helpers/db.js';
 import {
   setRepertoire,
   addRepertoireItem,
@@ -10,6 +10,7 @@ import {
 import { createSong } from '@/services/songs.js';
 import { createCelebration } from '@/services/celebrations.js';
 
+let capela;
 let coordenador;
 let musico;
 let celebration;
@@ -18,8 +19,9 @@ let comunhao;
 
 beforeEach(async () => {
   await resetDatabase();
-  coordenador = await makeCoordinator();
-  musico = await makeMusician();
+  capela = await makeCapela();
+  coordenador = await makeCoordinator({ capelaId: capela.id });
+  musico = await makeMusician({ capelaId: capela.id });
   celebration = await createCelebration(
     { title: 'Missa dominical', date: '2026-04-05T10:00:00.000Z', type: 'MISSA_COMUM' },
     coordenador,
@@ -39,7 +41,7 @@ afterAll(async () => {
 });
 
 describe('setRepertoire', () => {
-  it('monta o roteiro musical da celebração', async () => {
+  it('monta o roteiro musical da evento', async () => {
     const items = await setRepertoire(
       celebration.id,
       [
@@ -76,7 +78,7 @@ describe('setRepertoire', () => {
     expect(await prisma.repertoireItem.count()).toBe(1);
   });
 
-  it('guarda o tom escolhido para a celebração', async () => {
+  it('guarda o tom escolhido para a evento', async () => {
     const items = await setRepertoire(
       celebration.id,
       [{ songId: entrada.id, moment: 'ENTRADA', keyOverride: 'E' }],
@@ -112,7 +114,7 @@ describe('setRepertoire', () => {
     ).rejects.toMatchObject({ status: 422 });
   });
 
-  it('avisa quando a celebração não existe', async () => {
+  it('avisa quando a evento não existe', async () => {
     await expect(
       setRepertoire('inexistente', [{ songId: entrada.id, moment: 'ENTRADA' }], coordenador),
     ).rejects.toMatchObject({ status: 404 });
@@ -165,10 +167,31 @@ describe('addRepertoireItem e removeRepertoireItem', () => {
     );
     await expect(removeRepertoireItem(item.id, musico)).rejects.toMatchObject({ status: 403 });
   });
+
+  it('coordenador de outra capela não mexe no roteiro', async () => {
+    const outraCapela = await makeCapela({ name: 'Outra paróquia' });
+    const coordenadorDeFora = await makeCoordinator({ capelaId: outraCapela.id });
+
+    await expect(
+      setRepertoire(celebration.id, [{ songId: entrada.id, moment: 'ENTRADA' }], coordenadorDeFora),
+    ).rejects.toMatchObject({ status: 403 });
+    await expect(
+      addRepertoireItem(celebration.id, { songId: entrada.id, moment: 'ENTRADA' }, coordenadorDeFora),
+    ).rejects.toMatchObject({ status: 403 });
+
+    const [item] = await setRepertoire(
+      celebration.id,
+      [{ songId: entrada.id, moment: 'ENTRADA' }],
+      coordenador,
+    );
+    await expect(removeRepertoireItem(item.id, coordenadorDeFora)).rejects.toMatchObject({
+      status: 403,
+    });
+  });
 });
 
 describe('performanceKey', () => {
-  it('usa o tom escolhido para a celebração quando existe', () => {
+  it('usa o tom escolhido para a evento quando existe', () => {
     expect(performanceKey({ keyOverride: 'E', song: { originalKey: 'G' } })).toBe('E');
   });
 
@@ -178,7 +201,7 @@ describe('performanceKey', () => {
 });
 
 describe('buildScript', () => {
-  it('entrega o roteiro já com a cifra no tom da celebração', async () => {
+  it('entrega o roteiro já com a cifra no tom da evento', async () => {
     await setRepertoire(
       celebration.id,
       [
@@ -206,7 +229,7 @@ describe('buildScript', () => {
     );
 
     const script = await buildScript(celebration.id, musico);
-    // `chordPro` já vem no tom da celebração (pronto para imprimir);
+    // `chordPro` já vem no tom da evento (pronto para imprimir);
     // `sourceChordPro` é o texto original, no tom em que foi cadastrado.
     expect(script[0].chordPro).toBe('[A]Eis-me aqui, [D]Senhor');
     expect(script[0].sourceChordPro).toBe('[G]Eis-me aqui, [C]Senhor');
@@ -217,5 +240,39 @@ describe('buildScript', () => {
     await setRepertoire(celebration.id, [{ songId: entrada.id, moment: 'ACAO_DE_GRACAS' }], coordenador);
     const script = await buildScript(celebration.id, musico);
     expect(script[0]).toMatchObject({ title: 'Eis-me aqui', momentLabel: 'Ação de Graças' });
+  });
+
+  it('músico de outra capela não acessa o roteiro pronto', async () => {
+    await setRepertoire(celebration.id, [{ songId: entrada.id, moment: 'ENTRADA' }], coordenador);
+    const outraCapela = await makeCapela({ name: 'Outra paróquia' });
+    const musicoDeFora = await makeMusician({ capelaId: outraCapela.id });
+
+    await expect(buildScript(celebration.id, musicoDeFora)).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('músico de outra capela acessa o roteiro pronto se foi escalado como participante', async () => {
+    await setRepertoire(celebration.id, [{ songId: entrada.id, moment: 'ENTRADA' }], coordenador);
+    const outraCapela = await makeCapela({ name: 'Outra paróquia' });
+    const visitante = await makeMusician({ capelaId: outraCapela.id });
+    await prisma.celebration.update({
+      where: { id: celebration.id },
+      data: { participants: { connect: { id: visitante.id } } },
+    });
+
+    const script = await buildScript(celebration.id, visitante);
+    expect(script[0].title).toBe('Eis-me aqui');
+  });
+
+  it('coordenador de outra capela vê o roteiro pronto (mas não edita o roteiro)', async () => {
+    await setRepertoire(celebration.id, [{ songId: entrada.id, moment: 'ENTRADA' }], coordenador);
+    const outraCapela = await makeCapela({ name: 'Outra paróquia' });
+    const coordenadorDeFora = await makeCoordinator({ capelaId: outraCapela.id });
+
+    const script = await buildScript(celebration.id, coordenadorDeFora);
+    expect(script[0].title).toBe('Eis-me aqui');
+
+    await expect(
+      setRepertoire(celebration.id, [{ songId: comunhao.id, moment: 'COMUNHAO' }], coordenadorDeFora),
+    ).rejects.toMatchObject({ status: 403 });
   });
 });

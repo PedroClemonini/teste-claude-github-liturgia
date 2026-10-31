@@ -1,25 +1,42 @@
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
+import { redirect, notFound } from 'next/navigation';
 import { currentUser } from '@/lib/session.js';
-import { getCelebration } from '@/services/celebrations.js';
+import { getCelebration, isParticipantCoordinator } from '@/services/celebrations.js';
 import { buildScript } from '@/services/repertoire.js';
 import { seasonLabel } from '@/domain/liturgy/seasons.js';
 import { celebrationTypeLabel } from '@/domain/calendar/grid.js';
 import { momentLabel } from '@/domain/liturgy/moments.js';
-import { isCoordinator } from '@/domain/auth/roles.js';
+import { isAdministrator, isCoordinator } from '@/domain/auth/roles.js';
 import { SongViewer } from '@/components/SongViewer.jsx';
+import { DeleteCelebrationButton } from '@/components/DeleteCelebrationButton.jsx';
+import { ExportScriptPdfButton } from '@/components/ExportScriptPdfButton.jsx';
+import { PerformanceMode } from '@/components/PerformanceMode.jsx';
 
-export const metadata = { title: 'Celebração · Coral Litúrgico' };
+export const metadata = { title: 'evento · Coral Litúrgico' };
 
 export default async function CelebracaoPage({ params }) {
   const user = await currentUser();
   if (!user) redirect('/entrar');
+  if (isAdministrator(user)) redirect('/admin');
 
   const { id } = await params;
-  const celebration = await getCelebration(id, user);
-  const script = await buildScript(id, user);
+  let celebration;
+  let script;
+  try {
+    celebration = await getCelebration(id, user);
+    script = await buildScript(id, user);
+  } catch (error) {
+    if (error.status === 404) notFound();
+    throw error;
+  }
 
   const data = new Date(celebration.date);
+  // Roteiro e exclusão continuam exclusivos de quem administra a capela
+  // dona; editar as informações do evento também vale pra um coordenador
+  // escalado como participante, mesmo sendo de outra capela.
+  const ehDaPropriaCapela = isCoordinator(user) && celebration.capelaId === user.capelaId;
+  const podeEditarEvento = ehDaPropriaCapela || isParticipantCoordinator(user, celebration);
+  const podeGerenciar = ehDaPropriaCapela;
 
   return (
     <>
@@ -51,31 +68,72 @@ export default async function CelebracaoPage({ params }) {
               {celebrationTypeLabel(celebration.type)}
             </span>
             <span className="tag">{seasonLabel(celebration.season)}</span>
+            <span className="tag">{celebration.capela.name}</span>
             <span className="tag">
               {script.length} {script.length === 1 ? 'canto' : 'cantos'}
             </span>
           </div>
         </div>
-        {isCoordinator(user) && (
-          <Link className="btn" href={`/celebracoes/${celebration.id}/roteiro`}>
-            Editar roteiro
-          </Link>
+        {(podeEditarEvento || podeGerenciar) && (
+          <span className="row">
+            {podeEditarEvento && (
+              <Link className="btn btn--ghost" href={`/celebracoes/${celebration.id}/editar`}>
+                Editar evento
+              </Link>
+            )}
+            {podeGerenciar && (
+              <Link className="btn" href={`/celebracoes/${celebration.id}/roteiro`}>
+                Editar roteiro
+              </Link>
+            )}
+            {podeGerenciar && <DeleteCelebrationButton celebrationId={celebration.id} />}
+          </span>
         )}
       </div>
 
       {celebration.notes && <div className="notice">{celebration.notes}</div>}
 
+      {celebration.participants.length > 0 && (
+        <div className="row" style={{ marginBottom: '1rem' }}>
+          {celebration.participants.map((participant) => (
+            <span className="tag" key={participant.id}>
+              {participant.name}
+              {participant.capelaId !== celebration.capelaId && participant.capela
+                ? ` (${participant.capela.name})`
+                : ''}
+            </span>
+          ))}
+        </div>
+      )}
+
       {script.length === 0 ? (
         <p className="empty">
           O roteiro musical ainda não foi montado.
-          {isCoordinator(user) ? ' Use “Editar roteiro” para escolher os cantos.' : ''}
+          {podeGerenciar ? ' Use “Editar roteiro” para escolher os cantos.' : ''}
         </p>
       ) : (
         <>
-          <h2 style={{ fontSize: '1.1rem' }}>Roteiro musical</h2>
+          <div className="row" style={{ alignItems: 'baseline', justifyContent: 'space-between' }}>
+            <h2 style={{ fontSize: '1.1rem', margin: 0 }}>Roteiro musical</h2>
+            <span className="row">
+              <PerformanceMode
+                songs={script.map((item) => ({
+                  id: item.id,
+                  title: item.title,
+                  composer: item.composer,
+                  originalKey: item.originalKey,
+                  chordPro: item.sourceChordPro,
+                  momentLabel: item.momentLabel,
+                  performanceKey: item.key === item.originalKey ? null : item.key,
+                }))}
+              />
+              <ExportScriptPdfButton />
+            </span>
+          </div>
           <p style={{ color: 'var(--text-soft)', fontSize: '0.85rem', marginTop: 0 }}>
-            Toque em um canto para abrir a cifra. O tom já é o definido para esta celebração e
-            pode ser ajustado na hora.
+            Toque em um canto para abrir a cifra. O tom já é o definido para esta evento e
+            pode ser ajustado na hora. Na hora da missa, “Modo missa” abre as cifras em tela
+            cheia, na ordem do rito.
           </p>
 
           {script.map((item, index) => (
@@ -89,7 +147,7 @@ export default async function CelebracaoPage({ params }) {
               </summary>
               <div className="script-body">
                 {/*
-                  A cifra entra como foi cadastrada e o tom da celebração vai
+                  A cifra entra como foi cadastrada e o tom da evento vai
                   em `performanceKey`: é o SongViewer que transpõe, uma única
                   vez, e o músico continua podendo subir ou descer dali.
                 */}

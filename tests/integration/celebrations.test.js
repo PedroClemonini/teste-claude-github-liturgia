@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterAll } from 'vitest';
-import { prisma, resetDatabase, makeCoordinator, makeMusician } from '../helpers/db.js';
+import { prisma, resetDatabase, makeCapela, makeCoordinator, makeMusician } from '../helpers/db.js';
 import {
   createCelebration,
   updateCelebration,
@@ -7,17 +7,20 @@ import {
   listCelebrations,
   getCelebration,
   nextCelebrations,
+  listCelebrationCapelas,
 } from '@/services/celebrations.js';
 import { createSong } from '@/services/songs.js';
 import { setRepertoire } from '@/services/repertoire.js';
 
+let capela;
 let coordenador;
 let musico;
 
 beforeEach(async () => {
   await resetDatabase();
-  coordenador = await makeCoordinator();
-  musico = await makeMusician();
+  capela = await makeCapela();
+  coordenador = await makeCoordinator({ capelaId: capela.id });
+  musico = await makeMusician({ capelaId: capela.id });
 });
 afterAll(async () => {
   await resetDatabase();
@@ -31,7 +34,7 @@ const missa = {
 };
 
 describe('createCelebration', () => {
-  it('grava a celebração deduzindo o tempo litúrgico da data', async () => {
+  it('grava a evento deduzindo o tempo litúrgico da data', async () => {
     const celebration = await createCelebration(missa, coordenador);
     expect(celebration.season).toBe('PASCOA');
     expect(celebration.date.toISOString()).toBe('2026-04-05T10:00:00.000Z');
@@ -84,7 +87,7 @@ describe('updateCelebration', () => {
     expect(updated.season).toBe('TEMPO_COMUM');
   });
 
-  it('avisa quando a celebração não existe', async () => {
+  it('avisa quando a evento não existe', async () => {
     await expect(updateCelebration('inexistente', missa, coordenador)).rejects.toMatchObject({
       status: 404,
     });
@@ -111,12 +114,12 @@ describe('listCelebrations', () => {
     expect(list.map((c) => c.title)).toEqual(['Ensaio de março']);
   });
 
-  it('filtra por tipo de celebração', async () => {
+  it('filtra por tipo de evento', async () => {
     const list = await listCelebrations({ type: 'ENSAIO' }, musico);
     expect(list.map((c) => c.title)).toEqual(['Ensaio de março']);
   });
 
-  it('conta o roteiro de cada celebração', async () => {
+  it('conta o roteiro de cada evento', async () => {
     const song = await createSong(
       { title: 'Aleluia', chordPro: '[C]Aleluia', originalKey: 'C' },
       coordenador,
@@ -130,6 +133,29 @@ describe('listCelebrations', () => {
 
   it('exige autenticação para ver a agenda', async () => {
     await expect(listCelebrations({}, null)).rejects.toMatchObject({ status: 401 });
+  });
+
+  it('coordenador filtra por qualquer capela — vê de todas, uma de cada vez', async () => {
+    const outraCapela = await makeCapela({ name: 'Outra paróquia' });
+    const coordenadorDeFora = await makeCoordinator({ capelaId: outraCapela.id });
+    await createCelebration({ ...missa, title: 'Missa de lá' }, coordenadorDeFora);
+
+    const daPropria = await listCelebrations({ capelaId: capela.id }, coordenador);
+    expect(daPropria.map((c) => c.title)).not.toContain('Missa de lá');
+
+    const daOutra = await listCelebrations({ capelaId: outraCapela.id }, coordenador);
+    expect(daOutra.map((c) => c.title)).toEqual(['Missa de lá']);
+  });
+
+  it('músico não filtra por capela alheia — só vê a própria e onde participa', async () => {
+    const outraCapela = await makeCapela({ name: 'Outra paróquia' });
+    const coordenadorDeFora = await makeCoordinator({ capelaId: outraCapela.id });
+    await createCelebration({ ...missa, title: 'Missa de lá' }, coordenadorDeFora);
+
+    // O filtro de capela é exclusivo do coordenador; se o músico mandar um
+    // capelaId mesmo assim, ele é ignorado — a visibilidade dele nunca muda.
+    const list = await listCelebrations({ capelaId: outraCapela.id }, musico);
+    expect(list.map((c) => c.title)).not.toContain('Missa de lá');
   });
 });
 
@@ -174,8 +200,21 @@ describe('nextCelebrations', () => {
   });
 });
 
+describe('listCelebrationCapelas', () => {
+  it('lista só as capelas que têm alguma celebração, sem repetir', async () => {
+    await createCelebration({ ...missa, title: 'Primeira' }, coordenador);
+    await createCelebration({ ...missa, title: 'Segunda' }, coordenador);
+    // Capela fundada pelo coordenador (logo visível) mas sem nenhuma
+    // celebração — não deve aparecer no filtro.
+    await makeCapela({ name: 'Sem eventos', createdById: coordenador.id });
+
+    const capelas = await listCelebrationCapelas(coordenador);
+    expect(capelas).toEqual([{ id: capela.id, name: capela.name }]);
+  });
+});
+
 describe('deleteCelebration', () => {
-  it('remove a celebração junto com o roteiro', async () => {
+  it('remove a evento junto com o roteiro', async () => {
     const celebration = await createCelebration(missa, coordenador);
     const song = await createSong({ title: 'X', chordPro: '[C]X', originalKey: 'C' }, coordenador);
     await setRepertoire(celebration.id, [{ songId: song.id, moment: 'ENTRADA' }], coordenador);
@@ -189,5 +228,142 @@ describe('deleteCelebration', () => {
   it('só o coordenador remove celebrações', async () => {
     const celebration = await createCelebration(missa, coordenador);
     await expect(deleteCelebration(celebration.id, musico)).rejects.toMatchObject({ status: 403 });
+  });
+});
+
+describe('isolamento entre capelas', () => {
+  it('músico de outra capela não vê a evento, a não ser que participe dela', async () => {
+    const celebration = await createCelebration(missa, coordenador);
+    const outraCapela = await makeCapela({ name: 'Outra paróquia' });
+    const musicoDeFora = await makeMusician({ capelaId: outraCapela.id });
+
+    expect(await listCelebrations({}, musicoDeFora)).toEqual([]);
+    await expect(getCelebration(celebration.id, musicoDeFora)).rejects.toMatchObject({
+      status: 404,
+    });
+  });
+
+  it('músico vê (mas não gerencia) evento de outra capela quando é participante', async () => {
+    const outraCapela = await makeCapela({ name: 'Outra paróquia' });
+    const visitante = await makeMusician({ name: 'Visitante', capelaId: outraCapela.id });
+    const celebration = await createCelebration(
+      { ...missa, participantIds: [visitante.id] },
+      coordenador,
+    );
+
+    const lista = await listCelebrations({}, visitante);
+    expect(lista.map((c) => c.id)).toContain(celebration.id);
+    await expect(getCelebration(celebration.id, visitante)).resolves.toMatchObject({
+      id: celebration.id,
+    });
+  });
+
+  it('coordenador de outra capela não edita nem remove a evento', async () => {
+    const celebration = await createCelebration(missa, coordenador);
+    const outraCapela = await makeCapela({ name: 'Outra paróquia' });
+    const coordenadorDeFora = await makeCoordinator({ capelaId: outraCapela.id });
+
+    await expect(
+      updateCelebration(celebration.id, { ...missa, title: 'Invadida' }, coordenadorDeFora),
+    ).rejects.toMatchObject({ status: 403 });
+    await expect(deleteCelebration(celebration.id, coordenadorDeFora)).rejects.toMatchObject({
+      status: 403,
+    });
+  });
+
+  it('coordenador vê (mas não gerencia) evento de qualquer capela', async () => {
+    const outraCapela = await makeCapela({ name: 'Outra paróquia' });
+    const coordenadorDeLa = await makeCoordinator({ capelaId: outraCapela.id });
+    const celebration = await createCelebration({ ...missa, title: 'Missa de lá' }, coordenadorDeLa);
+
+    const lista = await listCelebrations({}, coordenador);
+    expect(lista.map((c) => c.title)).toContain('Missa de lá');
+    await expect(getCelebration(celebration.id, coordenador)).resolves.toMatchObject({
+      title: 'Missa de lá',
+    });
+
+    await expect(
+      updateCelebration(celebration.id, { ...missa, title: 'Invadida' }, coordenador),
+    ).rejects.toMatchObject({ status: 403 });
+    await expect(deleteCelebration(celebration.id, coordenador)).rejects.toMatchObject({
+      status: 403,
+    });
+  });
+
+  it('só administrador funda capela — coordenador nunca ganha gestão de outra capela', async () => {
+    const outraCapela = await makeCapela({ name: 'Capela alheia' });
+
+    await expect(
+      createCelebration({ ...missa, title: 'Missa alheia', capelaId: outraCapela.id }, coordenador),
+    ).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('coordenador escalado como participante edita as informações do evento de outra capela', async () => {
+    const outraCapela = await makeCapela({ name: 'Outra paróquia' });
+    const coordenadorVisitante = await makeCoordinator({ capelaId: outraCapela.id });
+    const celebration = await createCelebration(
+      { ...missa, participantIds: [coordenadorVisitante.id] },
+      coordenador,
+    );
+
+    const updated = await updateCelebration(
+      celebration.id,
+      { ...missa, title: 'Editado pelo visitante' },
+      coordenadorVisitante,
+    );
+    expect(updated.title).toBe('Editado pelo visitante');
+
+    // Mas isso não estende pro roteiro nem pra exclusão — essas continuam
+    // exclusivas de quem administra a capela dona.
+    await expect(deleteCelebration(celebration.id, coordenadorVisitante)).rejects.toMatchObject({
+      status: 403,
+    });
+  });
+});
+
+describe('participantes', () => {
+  it('escala participantes na criação, inclusive de outra capela', async () => {
+    const outraCapela = await makeCapela({ name: 'Outra paróquia' });
+    const visitante = await makeMusician({ name: 'Visitante', capelaId: outraCapela.id });
+
+    const celebration = await createCelebration(
+      { ...missa, participantIds: [musico.id, visitante.id] },
+      coordenador,
+    );
+    const found = await getCelebration(celebration.id, coordenador);
+    expect(found.participants.map((p) => p.id).sort()).toEqual([musico.id, visitante.id].sort());
+  });
+
+  it('lista a própria capela do observador primeiro, depois as outras, por nome', async () => {
+    const outraCapela = await makeCapela({ name: 'Outra paróquia' });
+    const zeta = await makeMusician({ name: 'Zeta', capelaId: capela.id });
+    const alfa = await makeMusician({ name: 'Alfa Visitante', capelaId: outraCapela.id });
+
+    const celebration = await createCelebration(
+      { ...missa, participantIds: [alfa.id, zeta.id, musico.id] },
+      coordenador,
+    );
+    const found = await getCelebration(celebration.id, coordenador);
+    // Própria capela (musico, Zeta) em ordem alfabética, depois a visitante.
+    expect(found.participants.map((p) => p.name)).toEqual(['João Músico', 'Zeta', 'Alfa Visitante']);
+  });
+
+  it('recusa participante inexistente', async () => {
+    await expect(
+      createCelebration({ ...missa, participantIds: ['inexistente'] }, coordenador),
+    ).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('updateCelebration substitui a lista de participantes', async () => {
+    const outro = await makeMusician({ capelaId: capela.id });
+    const celebration = await createCelebration({ ...missa, participantIds: [musico.id] }, coordenador);
+
+    const updated = await updateCelebration(
+      celebration.id,
+      { ...missa, participantIds: [outro.id] },
+      coordenador,
+    );
+    const found = await getCelebration(updated.id, coordenador);
+    expect(found.participants.map((p) => p.id)).toEqual([outro.id]);
   });
 });

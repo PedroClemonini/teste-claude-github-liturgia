@@ -68,7 +68,7 @@ describe('rótulos', () => {
     expect(monthLabel(2026, 4)).toBe('abril de 2026');
   });
 
-  it('nomeia os tipos de celebração', () => {
+  it('nomeia os tipos de evento', () => {
     expect(celebrationTypeLabel('MISSA_COMUM')).toBe('Missa');
     expect(celebrationTypeLabel('MISSA_SOLENE')).toBe('Missa solene');
     expect(celebrationTypeLabel('ENSAIO')).toBe('Ensaio');

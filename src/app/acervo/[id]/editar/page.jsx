@@ -1,7 +1,7 @@
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
+import { redirect, notFound } from 'next/navigation';
 import { currentUser } from '@/lib/session.js';
-import { isCoordinator } from '@/domain/auth/roles.js';
+import { isAdministrator, isCoordinator } from '@/domain/auth/roles.js';
 import { getSong } from '@/services/songs.js';
 import { SongForm } from '@/components/SongForm.jsx';
 
@@ -10,11 +10,18 @@ export const metadata = { title: 'Editar música · Coral Litúrgico' };
 export default async function EditarMusicaPage({ params }) {
   const user = await currentUser();
   if (!user) redirect('/entrar');
+  if (isAdministrator(user)) redirect('/admin');
 
   const { id } = await params;
   if (!isCoordinator(user)) redirect(`/acervo/${id}`);
 
-  const song = await getSong(id);
+  let song;
+  try {
+    song = await getSong(id);
+  } catch (error) {
+    if (error.status === 404) notFound();
+    throw error;
+  }
 
   return (
     <>
@@ -33,6 +40,7 @@ export default async function EditarMusicaPage({ params }) {
           composer: song.composer,
           chordPro: song.chordPro,
           originalKey: song.originalKey,
+          audioUrl: song.audioUrl,
           moments: song.moments,
           seasons: song.seasons,
         }}

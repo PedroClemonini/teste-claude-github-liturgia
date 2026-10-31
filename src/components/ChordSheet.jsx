@@ -18,9 +18,16 @@ import { transposeChord } from '@/domain/chordpro/transpose.js';
  *   semitones?: number,
  *   targetKey?: string|null,
  *   showChords?: boolean,
+ *   fontScale?: number,
  * }} props
  */
-export function ChordSheet({ chordPro, semitones = 0, targetKey = null, showChords = true }) {
+export function ChordSheet({
+  chordPro,
+  semitones = 0,
+  targetKey = null,
+  showChords = true,
+  fontScale = 1,
+}) {
   const doc = useMemo(() => parseChordPro(chordPro), [chordPro]);
 
   const renderChord = (chord) => {
@@ -34,7 +41,10 @@ export function ChordSheet({ chordPro, semitones = 0, targetKey = null, showChor
   }
 
   return (
-    <div className={`sheet ${showChords ? '' : 'sheet--lyrics-only'}`}>
+    <div
+      className={`sheet ${showChords ? '' : 'sheet--lyrics-only'}`}
+      style={{ fontSize: `${(1.05 * fontScale).toFixed(2)}rem` }}
+    >
       {doc.lines.map((line, index) => {
         if (line.type === 'empty') return <div className="sheet-gap" key={index} />;
 

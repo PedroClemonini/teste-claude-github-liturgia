@@ -88,6 +88,7 @@ export default async function AcervoPage({ searchParams }) {
               <Link className="song-link" href={`/acervo/${song.id}`}>
                 <strong>{song.title}</strong>
                 <span className="tag tag--key">{song.originalKey}</span>
+                {song.audioUrl && <span title="Tem link para ouvir">▶</span>}
                 {song.composer && <small>{song.composer}</small>}
                 {song.moments.length > 0 && (
                   <small>· {song.moments.map(momentLabel).join(', ')}</small>

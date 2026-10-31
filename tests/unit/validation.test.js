@@ -13,6 +13,7 @@ describe('registerSchema', () => {
     email: 'maria@paroquia.org',
     password: 'salmo23aleluia',
     voiceOrInstrument: 'Soprano',
+    inviteToken: 'token-do-convite',
   };
 
   it('aceita cadastro completo', () => {
@@ -36,8 +37,9 @@ describe('registerSchema', () => {
     expect(registerSchema.safeParse({ ...valid, voiceOrInstrument: '' }).success).toBe(false);
   });
 
-  it('assume o papel de músico quando não informado', () => {
-    expect(registerSchema.parse(valid).role).toBe('MUSICO');
+  it('exige o token do convite', () => {
+    const { inviteToken, ...semConvite } = valid;
+    expect(registerSchema.safeParse(semConvite).success).toBe(false);
   });
 });
 
@@ -94,7 +96,7 @@ describe('celebrationSchema', () => {
     type: 'MISSA_COMUM',
   };
 
-  it('aceita celebração completa', () => {
+  it('aceita evento completa', () => {
     expect(celebrationSchema.safeParse(valid).success).toBe(true);
   });
 
@@ -114,7 +116,7 @@ describe('celebrationSchema', () => {
     expect(celebrationSchema.parse({ ...valid, season: 'TEMPO_COMUM' }).season).toBe('TEMPO_COMUM');
   });
 
-  it('recusa tipo de celebração desconhecido', () => {
+  it('recusa tipo de evento desconhecido', () => {
     expect(celebrationSchema.safeParse({ ...valid, type: 'PIQUENIQUE' }).success).toBe(false);
   });
 });

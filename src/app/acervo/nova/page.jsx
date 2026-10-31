@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { currentUser } from '@/lib/session.js';
-import { isCoordinator } from '@/domain/auth/roles.js';
+import { isAdministrator, isCoordinator } from '@/domain/auth/roles.js';
 import { SongForm } from '@/components/SongForm.jsx';
 
 export const metadata = { title: 'Nova música · Coral Litúrgico' };
@@ -8,6 +8,7 @@ export const metadata = { title: 'Nova música · Coral Litúrgico' };
 export default async function NovaMusicaPage() {
   const user = await currentUser();
   if (!user) redirect('/entrar');
+  if (isAdministrator(user)) redirect('/admin');
   if (!isCoordinator(user)) redirect('/acervo');
 
   return (

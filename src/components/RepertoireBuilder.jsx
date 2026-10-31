@@ -2,7 +2,7 @@
 
 /**
  * Montagem do roteiro musical: uma linha por momento do rito, com a música
- * escolhida do acervo e o tom em que ela será executada nesta celebração.
+ * escolhida do acervo e o tom em que ela será executada nesta evento.
  */
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
