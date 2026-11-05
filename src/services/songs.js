@@ -9,6 +9,7 @@ import { prisma } from '@/lib/prisma.js';
 import { songSchema } from '@/domain/validation/schemas.js';
 import { ACTIONS, assertCan } from '@/domain/auth/roles.js';
 import { extractPlainLyrics } from '@/domain/chordpro/parse.js';
+import { matchingTags, normalizeTag } from '@/domain/songs/tags.js';
 import { ConflictError, NotFoundError, unwrap } from '@/domain/errors.js';
 
 const MAX_RESULTS = 200;
@@ -22,6 +23,7 @@ function toRow(data) {
     audioUrl: data.audioUrl ?? null,
     moments: data.moments,
     seasons: data.seasons,
+    tags: data.tags,
     plainLyrics: extractPlainLyrics(data.chordPro),
   };
 }
@@ -51,29 +53,36 @@ export async function getSong(id) {
 
 /**
  * Catálogo central: busca por título, trecho da letra, momento do rito e
- * tempo litúrgico. Músicas sem tempo definido servem em qualquer evento,
- * por isso continuam aparecendo no filtro por tempo.
+ * tempo litúrgico. O filtro por tempo é estrito: só traz as músicas marcadas
+ * com aquele tempo, deixando de fora as que não têm tempo definido. O texto
+ * também acha tags pelo pedaço do nome; começando com #, procura só nas tags.
  *
- * @param {{query?: string, moment?: string, season?: string, limit?: number}} filters
+ * @param {{query?: string, moment?: string, season?: string, tag?: string, limit?: number}} filters
  */
 export async function searchSongs(filters = {}) {
-  const { query, moment, season, limit } = filters;
+  const { query, moment, season, tag, limit } = filters;
   const where = { AND: [] };
 
   if (query?.trim()) {
     const term = query.trim();
-    where.AND.push({
-      OR: [
-        { title: { contains: term, mode: 'insensitive' } },
-        { plainLyrics: { contains: term, mode: 'insensitive' } },
-        { composer: { contains: term, mode: 'insensitive' } },
-      ],
-    });
+    const tags = matchingTags(await listSongTags(), term);
+    const byTag = { tags: { hasSome: tags } };
+    where.AND.push(
+      term.startsWith('#')
+        ? byTag
+        : {
+            OR: [
+              { title: { contains: term, mode: 'insensitive' } },
+              { plainLyrics: { contains: term, mode: 'insensitive' } },
+              { composer: { contains: term, mode: 'insensitive' } },
+              byTag,
+            ],
+          },
+    );
   }
+  if (tag) where.AND.push({ tags: { has: normalizeTag(tag) } });
   if (moment) where.AND.push({ moments: { has: moment } });
-  if (season) {
-    where.AND.push({ OR: [{ seasons: { has: season } }, { seasons: { isEmpty: true } }] });
-  }
+  if (season) where.AND.push({ seasons: { has: season } });
   if (where.AND.length === 0) delete where.AND;
 
   return prisma.song.findMany({
@@ -81,6 +90,12 @@ export async function searchSongs(filters = {}) {
     orderBy: { title: 'asc' },
     take: Math.min(limit ?? 50, MAX_RESULTS),
   });
+}
+
+/** Todas as tags em uso, em ordem alfabética. */
+export async function listSongTags() {
+  const rows = await prisma.$queryRaw`SELECT DISTINCT unnest(tags) AS tag FROM "Song" ORDER BY tag`;
+  return rows.map((row) => row.tag);
 }
 
 export async function deleteSong(id, actor) {

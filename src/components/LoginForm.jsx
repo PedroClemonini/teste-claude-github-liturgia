@@ -28,19 +28,20 @@ export function LoginForm() {
   };
 
   return (
-    <form onSubmit={submit} noValidate>
-      <label className="field">
+    <form className="ui-form ui-stack ui-auth__form" onSubmit={submit} noValidate>
+      <label className="ui-field">
         <span>E-mail</span>
         <input
           type="email"
           name="email"
           autoComplete="email"
           required
+          autoFocus
           value={form.email}
           onChange={(event) => setForm({ ...form, email: event.target.value })}
         />
       </label>
-      <label className="field">
+      <label className="ui-field">
         <span>Senha</span>
         <input
           type="password"
@@ -51,11 +52,15 @@ export function LoginForm() {
           onChange={(event) => setForm({ ...form, password: event.target.value })}
         />
       </label>
-      {error && <p className="error">{error}</p>}
-      <button className="btn" type="submit" disabled={busy}>
+      {error && (
+        <p className="ui-error" role="alert">
+          {error}
+        </p>
+      )}
+      <button className="ui-button ui-button--primary" type="submit" disabled={busy}>
         {busy ? 'Entrando…' : 'Entrar'}
       </button>
-      <p style={{ fontSize: '0.9rem', marginTop: '1rem' }}>
+      <p className="ui-auth__link">
         <Link href="/esqueci-senha">Esqueci minha senha</Link>
       </p>
     </form>

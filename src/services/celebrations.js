@@ -3,14 +3,21 @@
  */
 import { prisma } from '@/lib/prisma.js';
 import { celebrationSchema } from '@/domain/validation/schemas.js';
-import { ACTIONS, assertCan, assertManagesCapela, isCoordinator } from '@/domain/auth/roles.js';
+import {
+  ACTIONS,
+  assertCan,
+  assertManagesCapela,
+  canManageCapela,
+  isCoordinator,
+} from '@/domain/auth/roles.js';
 import { missingMoments, sortRepertoire } from '@/domain/liturgy/moments.js';
-import { NotFoundError, unwrap } from '@/domain/errors.js';
+import { NotFoundError, ValidationError, unwrap } from '@/domain/errors.js';
+import { isSaturdayMass } from '@/domain/liturgy/daily.js';
 
 /**
  * Filtro de visibilidade das celebrações: o coordenador vê de qualquer
- * capela (pode restringir a uma só via `capelaId`); o músico só vê a
- * própria capela, mais qualquer celebração — de qualquer capela — em que
+ * capela (pode restringir a uma só via `capelaId`); o músico só vê as
+ * próprias capelas, mais qualquer celebração — de qualquer capela — em que
  * tenha sido escalado como participante.
  */
 function visibilityWhere(actor, capelaId) {
@@ -18,18 +25,18 @@ function visibilityWhere(actor, capelaId) {
     return capelaId ? { capelaId } : {};
   }
   return {
-    OR: [{ capelaId: actor?.capelaId ?? '__none__' }, { participants: { some: { id: actor.id } } }],
+    OR: [{ capelaId: { in: actor.capelaIds ?? [] } }, { participants: { some: { id: actor.id } } }],
   };
 }
 
 /**
  * Ver o detalhe de uma celebração segue a mesma regra de `visibilityWhere`:
- * coordenador vê qualquer uma; músico só a própria ou onde participa. Isso
+ * coordenador vê qualquer uma; músico só as das suas capelas ou onde participa. Isso
  * não dá direito de geri-la — isso é checado à parte por `assertManagesCapela`.
  */
 export function canViewCelebration(actor, celebration) {
   if (isCoordinator(actor)) return true;
-  if (celebration.capelaId === actor.capelaId) return true;
+  if (actor.capelaIds?.includes(celebration.capelaId)) return true;
   return celebration.participants?.some((participant) => participant.id === actor.id) ?? false;
 }
 
@@ -57,7 +64,10 @@ export async function createCelebration(input, actor) {
   assertCan(actor, ACTIONS.MANAGE_CELEBRATION);
   const data = unwrap(celebrationSchema.safeParse(input));
 
-  const capelaId = data.capelaId ?? actor.capelaId;
+  // Sem capela informada, assume a primeira que o ator coordena.
+  const capelaId =
+    data.capelaId ??
+    actor.memberships?.find((membership) => canManageCapela(actor, { id: membership.capelaId }))?.capelaId;
   const capela = capelaId ? await prisma.capela.findUnique({ where: { id: capelaId } }) : null;
   assertManagesCapela(actor, capela);
   await requireParticipants(data.participantIds);
@@ -102,6 +112,30 @@ export async function updateCelebration(id, input, actor) {
     where: { id },
     data: { ...toRow(data), participants: { set: data.participantIds.map((id) => ({ id })) } },
   });
+}
+
+/** Liturgia de uma missa de sábado: quem edita o evento também decide isso. */
+export async function setLiturgyChoice(id, choice, actor) {
+  assertCan(actor, ACTIONS.MANAGE_CELEBRATION);
+  if (!['SABADO', 'DOMINGO'].includes(choice)) {
+    throw new ValidationError('Escolha a liturgia de sábado ou de domingo.', { choice: 'Opção inválida.' });
+  }
+
+  const existing = await prisma.celebration.findUnique({
+    where: { id },
+    include: { participants: { select: { id: true } } },
+  });
+  if (!existing) throw new NotFoundError('Evento não encontrado.');
+
+  if (!isParticipantCoordinator(actor, existing)) {
+    const capela = await prisma.capela.findUnique({ where: { id: existing.capelaId } });
+    assertManagesCapela(actor, capela);
+  }
+  if (!isSaturdayMass(existing)) {
+    throw new ValidationError('Só a missa de sábado tem essa opção.', { choice: 'Evento não é missa de sábado.' });
+  }
+
+  return prisma.celebration.update({ where: { id }, data: { liturgyChoice: choice } });
 }
 
 export async function deleteCelebration(id, actor) {
@@ -176,14 +210,28 @@ export async function listCelebrationCapelas(actor) {
   return rows.map((row) => row.capela).sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** Participantes com a própria capela do observador primeiro, depois as demais, por nome. */
-export function sortByOwnCapelaFirst(participants, viewerCapelaId) {
+function sharesCapela(person, capelaIds) {
+  return (person.memberships ?? []).some((membership) => capelaIds.includes(membership.capelaId));
+}
+
+/** Participantes das capelas do observador primeiro, depois os demais, por nome. */
+export function sortByOwnCapelaFirst(participants, viewerCapelaIds = []) {
   return [...participants].sort((a, b) => {
-    const aOwn = a.capelaId === viewerCapelaId ? 0 : 1;
-    const bOwn = b.capelaId === viewerCapelaId ? 0 : 1;
+    const aOwn = sharesCapela(a, viewerCapelaIds) ? 0 : 1;
+    const bOwn = sharesCapela(b, viewerCapelaIds) ? 0 : 1;
     if (aOwn !== bOwn) return aOwn - bOwn;
     return a.name.localeCompare(b.name);
   });
+}
+
+/** Opções de participante para o formulário de evento. */
+export function toParticipantOptions(members, viewerCapelaIds = []) {
+  return sortByOwnCapelaFirst(members, viewerCapelaIds).map((member) => ({
+    id: member.id,
+    name: member.name,
+    capelaName: member.memberships.map((membership) => membership.capela.name).join(', ') || null,
+    ownCapela: sharesCapela(member, viewerCapelaIds),
+  }));
 }
 
 /** Detalhes da evento com o roteiro na ordem do rito. */
@@ -196,7 +244,12 @@ export async function getCelebration(id, actor) {
       repertoire: { include: { song: true } },
       createdBy: { select: { id: true, name: true } },
       participants: {
-        select: { id: true, name: true, voiceOrInstrument: true, capelaId: true, capela: { select: { name: true } } },
+        select: {
+          id: true,
+          name: true,
+          instruments: true,
+          memberships: { select: { capelaId: true, capela: { select: { name: true } } } },
+        },
       },
     },
   });
@@ -207,6 +260,6 @@ export async function getCelebration(id, actor) {
   }
 
   const repertoire = sortRepertoire(celebration.repertoire);
-  const participants = sortByOwnCapelaFirst(celebration.participants, actor.capelaId);
+  const participants = sortByOwnCapelaFirst(celebration.participants, actor.capelaIds);
   return { ...celebration, repertoire, participants, missingMoments: missingMoments(repertoire) };
 }

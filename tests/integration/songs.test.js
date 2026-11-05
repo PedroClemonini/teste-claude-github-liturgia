@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterAll } from 'vitest';
 import { prisma, resetDatabase, makeCapela, makeCoordinator, makeMusician } from '../helpers/db.js';
-import { createSong, updateSong, getSong, searchSongs, deleteSong } from '@/services/songs.js';
+import { createSong, updateSong, getSong, searchSongs, deleteSong, listSongTags } from '@/services/songs.js';
 import { createCelebration } from '@/services/celebrations.js';
 import { setRepertoire } from '@/services/repertoire.js';
 
@@ -128,15 +128,45 @@ describe('searchSongs', () => {
     expect(songs.map((s) => s.title)).toEqual(['Noite Feliz', 'Pai Nosso']);
   });
 
-  it('filtra por tempo litúrgico, mantendo as músicas para qualquer tempo', async () => {
+  it('filtra por tempo litúrgico, trazendo só as músicas marcadas com ele', async () => {
     const songs = await searchSongs({ season: 'NATAL' });
-    // "Pai Nosso" não tem tempo definido, logo serve em qualquer evento.
-    expect(songs.map((s) => s.title)).toEqual(['Noite Feliz', 'Pai Nosso']);
+    // "Pai Nosso" não tem tempo definido, logo fica de fora do filtro.
+    expect(songs.map((s) => s.title)).toEqual(['Noite Feliz']);
   });
 
   it('combina filtros', async () => {
     const songs = await searchSongs({ query: 'noite', moment: 'ENTRADA', season: 'NATAL' });
     expect(songs.map((s) => s.title)).toEqual(['Noite Feliz']);
+  });
+
+  it('guarda as tags num formato único, sem repetir', async () => {
+    const song = await createSong(
+      { ...paiNosso, title: 'Hino', tags: ['#Novena São Francisco', 'novenasaofrancisco', ' Bênção '] },
+      coordenador,
+    );
+    expect(song.tags).toEqual(['novenasaofrancisco', 'bencao']);
+  });
+
+  it('acha por tag: pedaço do nome, com #, e pelo filtro exato', async () => {
+    await createSong({ ...paiNosso, title: 'Hino', tags: ['novenasaofrancisco'] }, coordenador);
+    await createSong({ ...paiNosso, title: 'Outro', tags: ['novenadenatal'] }, coordenador);
+
+    const titulos = async (filtros) => (await searchSongs(filtros)).map((s) => s.title).sort();
+    expect(await titulos({ query: '#novenasao' })).toEqual(['Hino']);
+    expect(await titulos({ query: '#novena' })).toEqual(['Hino', 'Outro']);
+    expect(await titulos({ query: 'São Francisco' })).toEqual(['Hino']);
+    expect(await titulos({ tag: 'novenadenatal' })).toEqual(['Outro']);
+    expect(await titulos({ tag: 'novena' })).toEqual([]);
+  });
+
+  it('com #, procura só nas tags, não no título', async () => {
+    expect(await searchSongs({ query: '#noite' })).toEqual([]);
+  });
+
+  it('lista as tags em uso, sem repetir', async () => {
+    await createSong({ ...paiNosso, title: 'A', tags: ['zeta', 'alfa'] }, coordenador);
+    await createSong({ ...paiNosso, title: 'B', tags: ['alfa'] }, coordenador);
+    expect(await listSongTags()).toEqual(['alfa', 'zeta']);
   });
 
   it('devolve lista vazia quando nada casa', async () => {

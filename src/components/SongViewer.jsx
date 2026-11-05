@@ -25,6 +25,8 @@ const FONT_SCALE_STEP = 0.15;
  *   performanceKey?: string|null,
  *   momentLabel?: string|null,
  *   variant?: 'full' | 'embedded',
+ *   offset?: number,
+ *   onOffsetChange?: (offset: number) => void,
  * }} props
  */
 export function SongViewer({
@@ -34,10 +36,16 @@ export function SongViewer({
   // "embedded" é o uso dentro do roteiro, onde título e momento já aparecem
   // na linha que se abre — repeti-los só empurraria a cifra para baixo.
   variant = 'full',
+  // Opcionais: quem precisa dividir a transposição com outra visão da mesma
+  // música guarda o valor e o passa aqui.
+  offset: sharedOffset,
+  onOffsetChange,
 }) {
   // Ponto de partida: o tom definido para a evento ou o tom original.
   const baseOffset = performanceKey ? semitonesBetween(song.originalKey, performanceKey) : 0;
-  const [offset, setOffset] = useState(baseOffset);
+  const [ownOffset, setOwnOffset] = useState(baseOffset);
+  const offset = sharedOffset ?? ownOffset;
+  const setOffset = onOffsetChange ?? setOwnOffset;
   const [showChords, setShowChords] = useState(true);
   const [fontScale, setFontScale] = useState(1);
 
@@ -71,7 +79,7 @@ export function SongViewer({
           {variant === 'full' && (
             <>
               {momentLabel && <p className="viewer-moment">{momentLabel}</p>}
-              <h1 className="viewer-title">{song.title}</h1>
+              <h1 className="viewer-title ui-heading-large">{song.title}</h1>
             </>
           )}
           <p className="viewer-meta">
@@ -84,8 +92,8 @@ export function SongViewer({
       <div className="viewer-controls" role="group" aria-label="Transposição">
         <button
           type="button"
-          className="btn btn--round"
-          onClick={() => setOffset((value) => value - 1)}
+          className="ui-button ui-button--icon"
+          onClick={() => setOffset(offset - 1)}
           aria-label="Descer meio tom"
         >
           −
@@ -96,8 +104,8 @@ export function SongViewer({
         </div>
         <button
           type="button"
-          className="btn btn--round"
-          onClick={() => setOffset((value) => value + 1)}
+          className="ui-button ui-button--icon"
+          onClick={() => setOffset(offset + 1)}
           aria-label="Subir meio tom"
         >
           +
@@ -105,7 +113,7 @@ export function SongViewer({
 
         <button
           type="button"
-          className="btn btn--ghost"
+          className="ui-button ui-button--subtle"
           onClick={() => setOffset(baseOffset)}
           disabled={!changed}
           aria-label={performanceKey ? 'Voltar ao tom da evento' : 'Voltar ao tom original'}
@@ -114,7 +122,7 @@ export function SongViewer({
         </button>
         <button
           type="button"
-          className="btn btn--ghost"
+          className="ui-button ui-button--subtle"
           onClick={() => setShowChords((value) => !value)}
           aria-label={showChords ? 'Somente letra' : 'Mostrar cifra'}
         >
@@ -124,7 +132,7 @@ export function SongViewer({
         <div className="viewer-font-controls" role="group" aria-label="Tamanho da letra">
           <button
             type="button"
-            className="btn btn--round btn--round--label"
+            className="ui-button ui-button--icon"
             onClick={() => changeFontScale(-FONT_SCALE_STEP)}
             disabled={fontScale <= FONT_SCALE_MIN}
             aria-label="Diminuir tamanho da letra"
@@ -133,7 +141,7 @@ export function SongViewer({
           </button>
           <button
             type="button"
-            className="btn btn--round btn--round--label"
+            className="ui-button ui-button--icon"
             onClick={() => changeFontScale(FONT_SCALE_STEP)}
             disabled={fontScale >= FONT_SCALE_MAX}
             aria-label="Aumentar tamanho da letra"

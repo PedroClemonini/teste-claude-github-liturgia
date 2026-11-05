@@ -7,6 +7,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { SongViewer } from './SongViewer.jsx';
+import { Icon } from './Icon.jsx';
 
 // Preferência de leitura, não do roteiro: vale para toda cifra aberta no modo
 // missa, por isso fica salva no aparelho.
@@ -24,9 +25,11 @@ const COLUMNS_STORAGE_KEY = 'cifra-colunas';
  *     performanceKey?: string|null,
  *   }>,
  *   label?: string,
+ *   offset?: number,
+ *   onOffsetChange?: (offset: number) => void,
  * }} props
  */
-export function PerformanceMode({ songs, label = 'Modo missa' }) {
+export function PerformanceMode({ songs, label = 'Modo missa', offset, onOffsetChange }) {
   const [active, setActive] = useState(false);
   const [index, setIndex] = useState(0);
   const [columns, setColumns] = useState(1);
@@ -131,7 +134,8 @@ export function PerformanceMode({ songs, label = 'Modo missa' }) {
 
   return (
     <>
-      <button type="button" className="btn btn--ghost" onClick={open}>
+      <button type="button" className="ui-button" onClick={open}>
+        <Icon name="fullscreen-enter" />
         {label}
       </button>
 
@@ -153,12 +157,12 @@ export function PerformanceMode({ songs, label = 'Modo missa' }) {
                 ignora as colunas, senão a cifra fica ilegível no celular em pé. */}
             <button
               type="button"
-              className="btn btn--ghost performance-columns"
+              className="ui-button performance-columns"
               onClick={toggleColumns}
             >
               {columns === 2 ? '1 coluna' : '2 colunas'}
             </button>
-            <button type="button" className="btn btn--ghost" onClick={close}>
+            <button type="button" className="ui-button" onClick={close}>
               Sair
             </button>
           </header>
@@ -170,6 +174,8 @@ export function PerformanceMode({ songs, label = 'Modo missa' }) {
               song={current}
               performanceKey={current.performanceKey ?? null}
               variant="embedded"
+              offset={offset}
+              onOffsetChange={onOffsetChange}
             />
           </div>
 
@@ -177,7 +183,7 @@ export function PerformanceMode({ songs, label = 'Modo missa' }) {
             <nav className="performance-nav" aria-label="Cantos do roteiro">
               <button
                 type="button"
-                className="btn btn--ghost"
+                className="ui-button"
                 onClick={() => go(-1)}
                 disabled={index === 0}
               >
@@ -188,7 +194,7 @@ export function PerformanceMode({ songs, label = 'Modo missa' }) {
               </span>
               <button
                 type="button"
-                className="btn btn--ghost"
+                className="ui-button"
                 onClick={() => go(1)}
                 disabled={index === total - 1}
               >

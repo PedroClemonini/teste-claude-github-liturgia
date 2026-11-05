@@ -3,7 +3,7 @@ import { currentUser } from '@/lib/session.js';
 import { createSong, searchSongs } from '@/services/songs.js';
 import { ACTIONS, assertCan } from '@/domain/auth/roles.js';
 
-/** Catálogo central: ?q= título ou trecho da letra, ?moment=, ?season= */
+/** Catálogo central: ?q= título, letra ou tag, ?moment=, ?season=, ?tag= */
 export async function GET(request) {
   return handle(async () => {
     const actor = await currentUser();
@@ -14,6 +14,7 @@ export async function GET(request) {
       query: url.searchParams.get('q') ?? undefined,
       moment: url.searchParams.get('moment') ?? undefined,
       season: url.searchParams.get('season') ?? undefined,
+      tag: url.searchParams.get('tag') ?? undefined,
       limit: Number(url.searchParams.get('limit')) || undefined,
     });
     return json({ songs });

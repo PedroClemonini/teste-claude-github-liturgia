@@ -7,7 +7,7 @@ vi.mock('@/lib/session.js', () => ({
   currentUser: async () => session.user,
 }));
 
-const { prisma, resetDatabase, makeCapela, makeCoordinator, makeMusician, makeAdministrator } = await import(
+const { prisma, resetDatabase, makeCapela, makeCoordinator, makeMusician, makeOwner } = await import(
   '../helpers/db.js'
 );
 const { createInvite } = await import('@/services/invites.js');
@@ -22,6 +22,7 @@ const membersRoute = await import('@/app/api/members/route.js');
 const memberRoute = await import('@/app/api/members/[id]/route.js');
 const memberRoleRoute = await import('@/app/api/members/[id]/role/route.js');
 const memberCapelaRoute = await import('@/app/api/members/[id]/capela/route.js');
+const profileRoute = await import('@/app/api/profile/route.js');
 const capelasRoute = await import('@/app/api/capelas/route.js');
 const invitesRoute = await import('@/app/api/invites/route.js');
 const inviteRoute = await import('@/app/api/invites/[id]/route.js');
@@ -61,7 +62,7 @@ describe('POST /api/register', () => {
         name: 'Maria Soprano',
         email: 'maria@paroquia.org',
         password: 'salmo23aleluia',
-        voiceOrInstrument: 'Soprano',
+        instruments: ['Soprano'],
         inviteToken: invite.token,
       }),
     );
@@ -70,7 +71,7 @@ describe('POST /api/register', () => {
     expect(body.user).toMatchObject({
       email: 'maria@paroquia.org',
       role: 'MUSICO',
-      capelaId: capela.id,
+      capelaIds: [capela.id],
     });
     expect(body.user.passwordHash).toBeUndefined();
   });
@@ -89,7 +90,7 @@ describe('POST /api/register', () => {
         name: 'Maria Soprano',
         email: 'maria@paroquia.org',
         password: 'salmo23aleluia',
-        voiceOrInstrument: 'Soprano',
+        instruments: ['Soprano'],
       }),
     );
     expect(response.status).toBe(422);
@@ -101,7 +102,7 @@ describe('POST /api/register', () => {
       name: 'Maria Soprano',
       email: 'maria@paroquia.org',
       password: 'salmo23aleluia',
-      voiceOrInstrument: 'Soprano',
+      instruments: ['Soprano'],
     };
     const invite1 = await createInvite(capela.id, coordenador);
     await registerRoute.POST(post({ ...payload, inviteToken: invite1.token }));
@@ -118,7 +119,7 @@ describe('POST /api/register', () => {
         name: 'Espertinho',
         email: 'esperto@paroquia.org',
         password: 'salmo23aleluia',
-        voiceOrInstrument: 'Baixo',
+        instruments: ['Baixo'],
         role: 'COORDENADOR',
         inviteToken: invite.token,
       }),
@@ -137,7 +138,7 @@ describe('POST /api/register', () => {
 
 describe('/api/capelas', () => {
   it('permite ao administrador fundar uma capela', async () => {
-    const admin = await makeAdministrator();
+    const admin = await makeOwner();
     session.user = admin;
     const response = await capelasRoute.POST(post({ name: 'Capela Nova' }));
     expect(response.status).toBe(201);
@@ -154,7 +155,7 @@ describe('/api/capelas', () => {
   });
 
   it('coordenador lista só a própria capela; administrador lista todas', async () => {
-    const admin = await makeAdministrator();
+    const admin = await makeOwner();
     session.user = admin;
     await capelasRoute.POST(post({ name: 'Capela Nova' }));
 
@@ -212,7 +213,7 @@ describe('/api/invites', () => {
   });
 
   it('administrador gera convite para uma capela que acabou de fundar', async () => {
-    const admin = await makeAdministrator();
+    const admin = await makeOwner();
     session.user = admin;
     const nova = await (await capelasRoute.POST(post({ name: 'Capela Nova' }))).json();
 
@@ -445,89 +446,133 @@ describe('/api/members', () => {
 
   it('deixa o coordenador promover um músico', async () => {
     session.user = coordenador;
-    const response = await memberRoleRoute.PATCH(patch({ role: 'COORDENADOR' }), params(musico.id));
+    const response = await memberRoleRoute.PATCH(
+      patch({ capelaId: capela.id, role: 'COORDENADOR' }),
+      params(musico.id),
+    );
     expect(response.status).toBe(200);
     expect((await response.json()).user.role).toBe('COORDENADOR');
   });
 
   it('impede o músico de mudar papéis', async () => {
     session.user = musico;
-    const response = await memberRoleRoute.PATCH(patch({ role: 'COORDENADOR' }), params(musico.id));
+    const response = await memberRoleRoute.PATCH(
+      patch({ capelaId: capela.id, role: 'COORDENADOR' }),
+      params(musico.id),
+    );
     expect(response.status).toBe(403);
   });
 
   it('recusa papel desconhecido', async () => {
     session.user = coordenador;
-    const response = await memberRoleRoute.PATCH(patch({ role: 'BISPO' }), params(musico.id));
+    const response = await memberRoleRoute.PATCH(patch({ capelaId: capela.id, role: 'BISPO' }), params(musico.id));
     expect(response.status).toBe(422);
   });
 
-  it('coordenador remove um integrante da própria capela', async () => {
+  const semCapela = (capelaId) =>
+    new Request(`http://localhost/api?capelaId=${capelaId}`, { method: 'DELETE' });
+
+  it('coordenador tira um integrante da própria capela, sem apagar a conta', async () => {
     session.user = coordenador;
-    const response = await memberRoute.DELETE(del(), params(musico.id));
+    const response = await memberCapelaRoute.DELETE(semCapela(capela.id), params(musico.id));
     expect(response.status).toBe(200);
+    expect(await prisma.user.findUnique({ where: { id: musico.id } })).not.toBeNull();
   });
 
-  it('coordenador não remove integrante de outra capela', async () => {
+  it('coordenador não tira integrante de outra capela', async () => {
     const outraCapela = await makeCapela({ name: 'Outra paróquia' });
     const musicoDeFora = await makeMusician({ capelaId: outraCapela.id });
 
     session.user = coordenador;
-    expect((await memberRoute.DELETE(del(), params(musicoDeFora.id))).status).toBe(403);
+    const response = await memberCapelaRoute.DELETE(semCapela(outraCapela.id), params(musicoDeFora.id));
+    expect(response.status).toBe(403);
   });
 
-  it('administrador remove integrante de qualquer capela', async () => {
-    session.user = await makeAdministrator();
+  it('só o dono apaga a conta', async () => {
+    session.user = coordenador;
+    expect((await memberRoute.DELETE(del(), params(musico.id))).status).toBe(403);
+
+    session.user = await makeOwner();
     expect((await memberRoute.DELETE(del(), params(musico.id))).status).toBe(200);
   });
 
   it('músico não remove ninguém', async () => {
     session.user = musico;
     expect((await memberRoute.DELETE(del(), params(coordenador.id))).status).toBe(403);
+    expect((await memberCapelaRoute.DELETE(semCapela(capela.id), params(coordenador.id))).status).toBe(403);
   });
 
-  it('administrador edita nome, e-mail, voz, capela e papel de um integrante', async () => {
-    session.user = await makeAdministrator();
-    const response = await memberRoute.PATCH(
-      patch({
-        name: 'Editado',
-        email: 'editado@paroquia.org',
-        voiceOrInstrument: 'Contralto',
-        capelaId: capela.id,
-        role: 'COORDENADOR',
-      }),
-      params(musico.id),
-    );
+  const edicao = () => ({
+    name: 'Editado',
+    email: 'editado@paroquia.org',
+    instruments: ['Contralto'],
+    memberships: [{ capelaId: capela.id, role: 'COORDENADOR' }],
+  });
+
+  it('o dono edita dados, capelas e papéis de um integrante', async () => {
+    session.user = await makeOwner();
+    const response = await memberRoute.PATCH(patch(edicao()), params(musico.id));
     expect(response.status).toBe(200);
     expect((await response.json()).user).toMatchObject({ name: 'Editado', role: 'COORDENADOR' });
   });
 
   it('coordenador não usa a edição completa', async () => {
     session.user = coordenador;
-    const response = await memberRoute.PATCH(
-      patch({
-        name: 'X',
-        email: 'x@paroquia.org',
-        voiceOrInstrument: 'X',
-        capelaId: capela.id,
-        role: 'MUSICO',
-      }),
-      params(musico.id),
-    );
-    expect(response.status).toBe(403);
+    expect((await memberRoute.PATCH(patch(edicao()), params(musico.id))).status).toBe(403);
   });
 
-  it('administrador move um integrante para outra capela', async () => {
+  it('coloca um integrante em outra capela, mantendo a anterior', async () => {
     const outraCapela = await makeCapela({ name: 'Outra paróquia' });
-    session.user = await makeAdministrator();
-    const response = await memberCapelaRoute.PATCH(patch({ capelaId: outraCapela.id }), params(musico.id));
-    expect(response.status).toBe(200);
-    expect((await response.json()).user.capelaId).toBe(outraCapela.id);
+    session.user = await makeOwner();
+    const response = await memberCapelaRoute.POST(post({ capelaId: outraCapela.id }), params(musico.id));
+    expect(response.status).toBe(201);
+    expect((await response.json()).user.capelaIds.sort()).toEqual([capela.id, outraCapela.id].sort());
   });
 
-  it('coordenador não move ninguém de capela', async () => {
+  it('coordenador não coloca ninguém em capela que não coordena', async () => {
+    const outraCapela = await makeCapela({ name: 'Outra paróquia' });
     session.user = coordenador;
-    const response = await memberCapelaRoute.PATCH(patch({ capelaId: capela.id }), params(musico.id));
+    const response = await memberCapelaRoute.POST(post({ capelaId: outraCapela.id }), params(musico.id));
     expect(response.status).toBe(403);
+  });
+
+  it('o dono cria um usuário direto na capela; o coordenador não', async () => {
+    const novo = () =>
+      post({ capelaId: capela.id, name: 'Nova', email: 'nova@paroquia.org', password: 'senhaForte1' });
+
+    session.user = coordenador;
+    expect((await membersRoute.POST(novo())).status).toBe(403);
+
+    session.user = await makeOwner();
+    const response = await membersRoute.POST(novo());
+    expect(response.status).toBe(201);
+    const { user } = await response.json();
+    expect(user.capelaIds).toEqual([capela.id]);
+    expect(user.passwordHash).toBeUndefined();
+  });
+});
+
+describe('/api/profile', () => {
+  const patch = (body) =>
+    new Request('http://localhost/api', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+  it('a pessoa muda os próprios dados, nunca os de outra', async () => {
+    session.user = musico;
+    const response = await profileRoute.PATCH(
+      patch({ id: coordenador.id, name: 'Novo Nome', email: musico.email, instruments: ['Flauta'] }),
+    );
+    expect(response.status).toBe(200);
+    expect((await response.json()).user).toMatchObject({ id: musico.id, name: 'Novo Nome', instruments: ['Flauta'] });
+
+    const outro = await prisma.user.findUnique({ where: { id: coordenador.id } });
+    expect(outro.name).toBe(coordenador.name);
+  });
+
+  it('exige autenticação', async () => {
+    expect((await profileRoute.PATCH(patch({ name: 'X', email: 'x@y.org' }))).status).toBe(401);
   });
 });

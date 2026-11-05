@@ -39,13 +39,30 @@ navegador e no `seed`.
 
 ## Funcionalidades
 
+### Liturgia do dia
+- A Agenda mostra a liturgia do dia, com cor, leituras e o texto completo. As setas
+  navegam entre os dias.
+- Os textos vêm da API pública [liturgia-diaria](https://github.com/Dancrf/liturgia-diaria)
+  e ficam guardados na tabela `LiturgyDay`. Cada visita à Agenda completa mais alguns
+  dias até o fim do ano, sem atrasar a tela. Se a API cair, o que já foi guardado
+  continua aparecendo. A URL pode ser trocada por `LITURGY_API_URL`.
+- Cada missa mostra a sua liturgia. Na missa de sábado, das 17h em diante vale a
+  liturgia de domingo; quem edita o evento pode trocar entre as duas.
+
 ### Usuários e autenticação
-- Cadastro simples: nome, e-mail, senha e voz ou instrumento (ex.: Soprano, Violão).
+- Cadastro por convite: nome, e-mail, senha e vozes ou instrumentos (ex.: Soprano,
+  Violão). Quem já tem conta entra em outra capela pelo mesmo link, com a mesma senha.
+- Aba **Perfil**: cada pessoa muda o próprio nome, e-mail, senha e instrumentos;
+  trocar e-mail ou senha pede a senha atual.
 - Login por NextAuth; a senha é guardada apenas como hash bcrypt.
 - **Esqueci minha senha**: o link no login pede o e-mail e envia um link de uso
   único, válido por 1 hora. Ver [Recuperação de senha](#recuperação-de-senha).
-- Dois papéis: **Coordenador** (edita calendário, cadastra músicas, monta roteiros,
-  muda papéis) e **Músico** (consulta escalas e cifras).
+- Uma pessoa pode estar em **uma ou mais capelas**, com um papel em cada:
+  **Coordenador** (edita calendário, cadastra músicas, monta roteiros, muda papéis)
+  ou **Músico** (consulta escalas e cifras).
+- Um único coordenador é o **dono** do sistema: coordena todas as capelas, cria
+  capelas e adiciona pessoas em cada uma, por link ou com nome, e-mail e senha
+  (aba **Capelas**). O próprio banco impede um segundo dono.
 - A permissão é cobrada no servidor, em `services/`, não só na interface —
   esconder um botão não protege uma rota.
 
@@ -55,13 +72,14 @@ navegador e no `seed`.
 - Data, horário e **tempo litúrgico**, este último calculado a partir da data:
   Páscoa pelo algoritmo de Meeus/Jones/Butcher e, dela, Cinzas, Tríduo,
   Pentecostes, Advento e Batismo do Senhor. O coordenador pode sobrepor à mão.
-- Roteiro musical com os treze momentos do rito: Entrada, Ato Penitencial, Glória,
-  Salmo, Aclamação, Ofertório, Santo, Mistério da Fé, Grande Amém, Cordeiro,
-  Comunhão, Ação de Graças e Final — incluindo as partes fixas cantadas dentro
-  da Oração Eucarística.
+- Roteiro musical com os catorze momentos do rito: Entrada, Hinos, Ato Penitencial, Glória,
+  Salmo, Aclamação, Ladainha, Ofertório, Santo, Oração Eucarística, Cordeiro,
+  Comunhão, Ação de Graças e Final.
 
 ### Acervo e cifras
 - Busca por título, por trecho da letra ou por adequação litúrgica (momento e tempo).
+- Tags livres, como `#novenasaofrancisco`: digitar `#novena` na busca encontra pelo
+  pedaço do nome, e o Acervo tem um filtro por tag.
   Para isso, cada música guarda também a letra sem acordes.
 - **Editor ChordPro**: o acorde é digitado entre colchetes, encostado na sílaba
   em que muda — `[G]Pai Nosso que est[C]ais no c[G]éu`.
@@ -104,6 +122,10 @@ Gere o `AUTH_SECRET` de produção com `openssl rand -base64 32`.
 Requisito: Docker e Docker Compose. Sobe a aplicação (build multi-stage do
 Next.js) e o PostgreSQL juntos; o container da aplicação aplica o schema do
 Prisma (`prisma db push`) automaticamente antes de iniciar o servidor.
+
+Bases criadas antes do modelo de várias capelas precisam de uma migração, uma
+única vez, antes de subir a versão nova: o `db push` recusa apagar colunas com
+dados. Veja as instruções em `prisma/upgrade-capelas-multiplas.sql`.
 
 ```bash
 docker compose up -d --build          # http://localhost:3000
@@ -196,8 +218,8 @@ compartilham o mesmo banco.
   evento (pronto para imprimir ou consumir pela API) e `sourceChordPro` como
   foi cadastrada. A tela do músico parte da segunda, o que impede transpor duas
   vezes a mesma cifra.
-- **Música sem tempo litúrgico serve em qualquer tempo**, e por isso continua
-  aparecendo quando se filtra por Natal ou Páscoa.
+- **O filtro por tempo litúrgico é estrito**: filtrar por Natal ou Páscoa traz só
+  as músicas marcadas com aquele tempo; as sem tempo definido ficam de fora.
 - **Datas em UTC** em todo o cálculo litúrgico: o tempo litúrgico de um dia é o
   mesmo para toda a equipe, qualquer que seja o fuso do aparelho.
 - **Excluir música usada em roteiro é bloqueado** (409), para não abrir buraco no

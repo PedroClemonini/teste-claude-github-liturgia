@@ -1,6 +1,10 @@
 import Link from 'next/link';
 import { buildMonthGrid, WEEKDAYS, celebrationTypeLabel } from '@/domain/calendar/grid.js';
+import { fallbackColor, LITURGY_COLORS } from '@/domain/liturgy/daily.js';
 import { seasonLabel } from '@/domain/liturgy/seasons.js';
+import { Icon } from './Icon.jsx';
+
+const TYPES = ['MISSA_COMUM', 'MISSA_SOLENE', 'ENSAIO'];
 
 const hora = (date) =>
   new Date(date).toLocaleTimeString('pt-BR', {
@@ -13,10 +17,17 @@ const hora = (date) =>
  * Painel de agenda. Em telas largas mostra a grade do mês; no celular a mesma
  * informação vira lista cronológica, que é como a equipe consulta na hora.
  *
- * @param {{year: number, month: number, celebrations: object[], today?: string}} props
+ * `liturgyColors` traz a cor oficial dos dias já guardados; nos demais, o ponto
+ * usa a cor do tempo litúrgico calculado.
+ *
+ * @param {{year: number, month: number, celebrations: object[], today?: string, liturgyColors?: Record<string, {cor: string, liturgia: string}>}} props
  */
-export function CalendarBoard({ year, month, celebrations, today }) {
+export function CalendarBoard({ year, month, celebrations, today, liturgyColors = {} }) {
   const weeks = buildMonthGrid(year, month, celebrations);
+  const days = weeks.flat();
+  // Todo dia tem o ponto da cor litúrgica; o nome aparece só onde o tempo começa
+  // na grade, senão se repetiria em todas as células.
+  const startsSeason = (day) => days[days.indexOf(day) - 1]?.season !== day.season;
 
   return (
     <>
@@ -40,16 +51,20 @@ export function CalendarBoard({ year, month, celebrations, today }) {
                   .join(' ')}
               >
                 <div className="calendar-day-number">
+                  <span className="calendar-day-date">{day.day}</span>
                   <span
-                    className="season-dot"
-                    data-season={day.season}
-                    title={seasonLabel(day.season)}
-                  />
-                  {day.day}
+                    className="calendar-day-season"
+                    title={liturgyColors[day.iso]?.liturgia ?? seasonLabel(day.season)}
+                  >
+                    <span className="cor-dot" data-cor={liturgyColors[day.iso]?.cor ?? fallbackColor(day.season)} />
+                    {startsSeason(day) ? (
+                      <span className="calendar-day-season__label">{seasonLabel(day.season)}</span>
+                    ) : (
+                      <span className="ui-visually-hidden">{seasonLabel(day.season)}</span>
+                    )}
+                  </span>
                 </div>
-                <div
-                  className={`calendar-day-events ${day.celebrations.length > 3 ? 'calendar-day-events--compact' : ''}`}
-                >
+                <div className="calendar-day-events">
                   {day.celebrations.map((celebration) => (
                     <Link
                       key={celebration.id}
@@ -66,6 +81,21 @@ export function CalendarBoard({ year, month, celebrations, today }) {
             ))}
           </div>
         ))}
+
+        <ul className="calendar-legend" aria-label="Legenda">
+          {TYPES.map((type) => (
+            <li key={type}>
+              <span className="calendar-legend__type" data-type={type} />
+              {celebrationTypeLabel(type)}
+            </li>
+          ))}
+          {LITURGY_COLORS.map((color) => (
+            <li key={color}>
+              <span className="cor-dot" data-cor={color} />
+              {color}
+            </li>
+          ))}
+        </ul>
       </div>
 
       <div className="agenda-list--mobile">
@@ -78,48 +108,48 @@ export function CalendarBoard({ year, month, celebrations, today }) {
 /** Lista cronológica das celebrações, com o indicador de roteiro. */
 export function AgendaList({ celebrations }) {
   if (celebrations.length === 0) {
-    return <p className="empty">Nenhuma evento neste período.</p>;
+    return (
+      <div className="ui-empty">
+        <Icon name="calendar" size={32} />
+        <p>Nenhum evento neste período.</p>
+      </div>
+    );
   }
 
   return (
-    <div>
+    <ul className="ui-list">
       {celebrations.map((celebration) => {
         const date = new Date(celebration.date);
+        const weekday = date.toLocaleDateString('pt-BR', { weekday: 'short', timeZone: 'UTC' });
+        const month = date.toLocaleDateString('pt-BR', { month: 'short', timeZone: 'UTC' });
         return (
-          <Link
-            className="agenda-item"
-            key={celebration.id}
-            href={`/celebracoes/${celebration.id}`}
-          >
-            <div className="agenda-date">
-              <strong>{date.getUTCDate()}</strong>
-              <span>
-                {date.toLocaleDateString('pt-BR', { weekday: 'short', timeZone: 'UTC' })}
+          <li key={celebration.id}>
+            <Link className="ui-list-item" href={`/celebracoes/${celebration.id}`}>
+              <span className="ui-date">
+                <strong>{date.getUTCDate()}</strong>
+                {month.replace('.', '')}
               </span>
-            </div>
-            <div className="agenda-body">
-              <h3>{celebration.title}</h3>
-              <p>
-                {hora(celebration.date)} · {seasonLabel(celebration.season)}
-                {typeof celebration.songCount === 'number'
-                  ? ` · ${celebration.songCount} ${celebration.songCount === 1 ? 'canto' : 'cantos'}`
-                  : ''}
-              </p>
-            </div>
-            <span
-              className={`tag ${
-                celebration.type === 'MISSA_SOLENE'
-                  ? 'tag--solene'
-                  : celebration.type === 'ENSAIO'
-                    ? 'tag--ensaio'
-                    : ''
-              }`}
-            >
-              {celebrationTypeLabel(celebration.type)}
-            </span>
-          </Link>
+              <span className="ui-list-item__text">
+                <span className="ui-list-item__title">{celebration.title}</span>
+                <span className="ui-subtle">
+                  {weekday.replace('.', '')}, {hora(celebration.date)} · {seasonLabel(celebration.season)}
+                </span>
+                <span className="ui-list-item__meta">
+                  <span className="ui-lozenge" data-type={celebration.type}>
+                    {celebrationTypeLabel(celebration.type)}
+                  </span>
+                  {typeof celebration.songCount === 'number' && (
+                    <span className="ui-list-item__songs">
+                      <Icon name="audio" size={12} />
+                      {celebration.songCount} {celebration.songCount === 1 ? 'canto' : 'cantos'}
+                    </span>
+                  )}
+                </span>
+              </span>
+            </Link>
+          </li>
         );
       })}
-    </div>
+    </ul>
   );
 }

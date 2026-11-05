@@ -1,16 +1,15 @@
-import Link from 'next/link';
 import { redirect, notFound } from 'next/navigation';
 import { currentUser } from '@/lib/session.js';
-import { isAdministrator, isCoordinator } from '@/domain/auth/roles.js';
-import { getSong } from '@/services/songs.js';
+import { isCoordinator } from '@/domain/auth/roles.js';
+import { getSong, listSongTags } from '@/services/songs.js';
 import { SongForm } from '@/components/SongForm.jsx';
+import { Breadcrumbs } from '@/components/Breadcrumbs.jsx';
 
 export const metadata = { title: 'Editar música · Coral Litúrgico' };
 
 export default async function EditarMusicaPage({ params }) {
   const user = await currentUser();
   if (!user) redirect('/entrar');
-  if (isAdministrator(user)) redirect('/admin');
 
   const { id } = await params;
   if (!isCoordinator(user)) redirect(`/acervo/${id}`);
@@ -25,13 +24,15 @@ export default async function EditarMusicaPage({ params }) {
 
   return (
     <>
-      <div className="page-head">
-        <div className="grow">
-          <p style={{ margin: 0, fontSize: '0.85rem' }}>
-            <Link href={`/acervo/${song.id}`}>← {song.title}</Link>
-          </p>
-          <h1>Editar música</h1>
-        </div>
+      <Breadcrumbs
+        items={[
+          { href: '/acervo', label: 'Acervo' },
+          { href: `/acervo/${song.id}`, label: song.title },
+          { label: 'Editar' },
+        ]}
+      />
+      <div className="ui-page-head">
+        <h1 className="ui-heading-large">Editar música</h1>
       </div>
       <SongForm
         song={{
@@ -43,7 +44,9 @@ export default async function EditarMusicaPage({ params }) {
           audioUrl: song.audioUrl,
           moments: song.moments,
           seasons: song.seasons,
+          tags: song.tags,
         }}
+        tagSuggestions={await listSongTags()}
       />
     </>
   );

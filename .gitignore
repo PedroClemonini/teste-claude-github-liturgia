@@ -9,3 +9,6 @@ coverage/
 *.log
 .DS_Store
 next-env.d.ts
+
+# Usuários e senhas do ambiente de dev
+README.dev.md

@@ -1,21 +1,25 @@
 /**
  * Controle de acesso por papel.
  *
- * O Administrador funda capelas e concede coordenações, em qualquer capela;
- * o Coordenador organiza a própria capela (calendário, acervo, equipe); o
- * Músico consulta as escalas e as cifras. Toda checagem passa por
- * `can`/`assertCan`, inclusive nas rotas de API, para que a interface nunca
- * seja a única barreira.
+ * O papel é por capela: a mesma pessoa pode coordenar uma e ser Músico em
+ * outra. O Coordenador organiza as capelas que coordena (calendário, equipe);
+ * o Músico consulta as escalas e as cifras. O dono é um coordenador com um
+ * atributo a mais: coordena todas as capelas, cria capelas e adiciona pessoas
+ * em qualquer uma.
+ *
+ * `toActor` resume os vínculos num `role` geral, usado por `can` para as ações
+ * que não dependem de capela; as que dependem passam por `canManageCapela`.
+ * Toda checagem passa por aqui, inclusive nas rotas de API, para que a
+ * interface nunca seja a única barreira.
  */
 
 export const ROLES = [
-  { id: 'ADMINISTRADOR', label: 'Administrador' },
   { id: 'COORDENADOR', label: 'Coordenador' },
   { id: 'MUSICO', label: 'Músico' },
 ];
 
-/** Papéis que podem ser atribuídos pela tela Equipe/Admin — nunca Administrador. */
-export const ASSIGNABLE_ROLES = ROLES.filter((role) => role.id !== 'ADMINISTRADOR');
+/** Papéis que podem ser atribuídos num vínculo com uma capela. */
+export const ASSIGNABLE_ROLES = ROLES;
 
 const ROLE_BY_ID = new Map(ROLES.map((role) => [role.id, role]));
 
@@ -30,9 +34,6 @@ export const ACTIONS = {
 };
 
 const PERMISSIONS = {
-  // Funda capelas e concede coordenações — não opera agenda/acervo de
-  // nenhuma capela diretamente, isso fica com quem ele nomear coordenador.
-  ADMINISTRADOR: new Set([ACTIONS.MANAGE_CAPELA, ACTIONS.MANAGE_USERS]),
   COORDENADOR: new Set([
     ACTIONS.VIEW_CALENDAR,
     ACTIONS.MANAGE_CELEBRATION,
@@ -59,7 +60,7 @@ export class AuthorizationError extends Error {
   }
 }
 
-/** @param {{role?: string}|null|undefined} user */
+/** @param {string} id */
 export function roleLabel(id) {
   return ROLE_BY_ID.get(id)?.label ?? id;
 }
@@ -69,9 +70,32 @@ export function isCoordinator(user) {
   return user?.role === 'COORDENADOR';
 }
 
-/** @param {{role?: string}|null|undefined} user */
-export function isAdministrator(user) {
-  return user?.role === 'ADMINISTRADOR';
+/** @param {{isOwner?: boolean|null}|null|undefined} user */
+export function isOwner(user) {
+  return user?.isOwner === true;
+}
+
+/** Rótulo curto de quem está logado, para o cabeçalho. */
+export function actorLabel(user) {
+  return isOwner(user) ? 'Dono' : roleLabel(user?.role);
+}
+
+/**
+ * Monta o "ator" usado nas checagens a partir do usuário com seus vínculos.
+ * `role` é Coordenador se a pessoa coordena ao menos uma capela (ou é o dono).
+ * @param {{isOwner?: boolean|null, memberships?: {capelaId: string, role: string}[]}} user
+ */
+export function toActor(user) {
+  const memberships = user.memberships ?? [];
+  const owner = user.isOwner === true;
+  const coordinates = memberships.some((membership) => membership.role === 'COORDENADOR');
+  return {
+    ...user,
+    memberships,
+    isOwner: owner,
+    role: owner || coordinates ? 'COORDENADOR' : 'MUSICO',
+    capelaIds: memberships.map((membership) => membership.capelaId),
+  };
 }
 
 /**
@@ -82,6 +106,7 @@ export function isAdministrator(user) {
 export function can(user, action) {
   if (!user?.role) return false;
   if (!KNOWN_ACTIONS.has(action)) return false;
+  if (action === ACTIONS.MANAGE_CAPELA) return isOwner(user);
   return PERMISSIONS[user.role]?.has(action) ?? false;
 }
 
@@ -100,22 +125,23 @@ export function assertCan(user, action) {
 }
 
 /**
- * Um administrador administra qualquer capela. Um coordenador administra
- * só a própria capela-casa — mesmo que tenha fundado outras no passado,
- * quem passa a coordená-las é quem o administrador designar para lá.
- * @param {{role?: string, capelaId?: string|null}|null} actor
+ * O dono administra todas as capelas; o coordenador, só aquelas em que tem
+ * vínculo de Coordenador. Ser Músico numa capela não dá direito de geri-la,
+ * mesmo que a pessoa coordene outra.
+ * @param {{isOwner?: boolean, memberships?: {capelaId: string, role: string}[]}|null} actor
  * @param {{id: string}|null} capela
  */
 export function canManageCapela(actor, capela) {
-  if (!capela) return false;
-  if (isAdministrator(actor)) return true;
-  if (!isCoordinator(actor)) return false;
-  return actor.capelaId === capela.id;
+  if (!capela || !actor) return false;
+  if (isOwner(actor)) return true;
+  return (actor.memberships ?? []).some(
+    (membership) => membership.capelaId === capela.id && membership.role === 'COORDENADOR',
+  );
 }
 
 /**
- * @param {{id?: string, role?: string, capelaId?: string|null}|null} actor
- * @param {{id: string, createdById?: string|null}|null} capela
+ * @param {object|null} actor
+ * @param {{id: string}|null} capela
  * @throws {AuthorizationError}
  */
 export function assertManagesCapela(actor, capela) {
@@ -130,5 +156,18 @@ export function assertManagesCapela(actor, capela) {
       status: 403,
       action: ACTIONS.MANAGE_CAPELA,
     });
+  }
+}
+
+/**
+ * @param {object|null} actor
+ * @throws {AuthorizationError}
+ */
+export function assertOwner(actor) {
+  if (!actor?.role) {
+    throw new AuthorizationError('É preciso entrar para continuar.', { status: 401 });
+  }
+  if (!isOwner(actor)) {
+    throw new AuthorizationError('Esta ação é exclusiva do dono do sistema.', { status: 403 });
   }
 }

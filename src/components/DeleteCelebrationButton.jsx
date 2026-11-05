@@ -2,17 +2,18 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ConfirmModal } from './ConfirmModal.jsx';
+import { Icon } from './Icon.jsx';
 
 /** @param {{celebrationId: string}} props */
 export function DeleteCelebrationButton({ celebrationId }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [confirming, setConfirming] = useState(false);
 
   const excluir = async () => {
-    if (!window.confirm('Excluir esta evento e todo o roteiro? Essa ação não pode ser desfeita.')) {
-      return;
-    }
+    setConfirming(false);
     setBusy(true);
     setError(null);
 
@@ -21,7 +22,7 @@ export function DeleteCelebrationButton({ celebrationId }) {
 
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
-      setError(body.error ?? 'Não foi possível excluir a evento.');
+      setError(body.error ?? 'Não foi possível excluir o evento.');
       return;
     }
     router.push('/agenda');
@@ -29,11 +30,32 @@ export function DeleteCelebrationButton({ celebrationId }) {
   };
 
   return (
-    <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-      <button type="button" className="btn btn--danger" disabled={busy} onClick={excluir}>
-        {busy ? 'Excluindo…' : 'Excluir evento'}
+    <>
+      <button
+        type="button"
+        className="ui-button ui-button--danger"
+        title="Excluir evento"
+        disabled={busy}
+        onClick={() => setConfirming(true)}
+      >
+        <Icon name="delete" />
+        <span className="ui-button__label">{busy ? 'Excluindo…' : 'Excluir evento'}</span>
       </button>
-      {error && <p className="error">{error}</p>}
-    </span>
+      {error && (
+        <p className="ui-error" role="alert">
+          {error}
+        </p>
+      )}
+      {confirming && (
+        <ConfirmModal
+          title="Excluir este evento?"
+          confirmLabel="Excluir evento"
+          onConfirm={excluir}
+          onCancel={() => setConfirming(false)}
+        >
+          O evento e todo o roteiro serão apagados. Essa ação não pode ser desfeita.
+        </ConfirmModal>
+      )}
+    </>
   );
 }

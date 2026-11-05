@@ -37,8 +37,10 @@ export function ForgotPasswordForm() {
   if (enviado) {
     return (
       <>
-        <p className="success">{enviado}</p>
-        <p style={{ fontSize: '0.9rem', marginTop: '1rem' }}>
+        <p className="ui-success" role="status">
+          {enviado}
+        </p>
+        <p className="ui-auth__link">
           <Link href="/entrar">Voltar para o login</Link>
         </p>
       </>
@@ -46,8 +48,8 @@ export function ForgotPasswordForm() {
   }
 
   return (
-    <form onSubmit={submit} noValidate>
-      <label className="field">
+    <form className="ui-form ui-stack ui-auth__form" onSubmit={submit} noValidate>
+      <label className="ui-field">
         <span>E-mail cadastrado</span>
         <input
           type="email"
@@ -57,14 +59,19 @@ export function ForgotPasswordForm() {
           autoFocus
           value={email}
           onChange={(event) => setEmail(event.target.value)}
+          aria-invalid={Boolean(errors.email)}
         />
-        {errors.email && <p className="error">{errors.email}</p>}
+        {errors.email && <p className="ui-error">{errors.email}</p>}
       </label>
-      {message && <p className="error">{message}</p>}
-      <button className="btn" type="submit" disabled={busy || !email.trim()}>
+      {message && (
+        <p className="ui-error" role="alert">
+          {message}
+        </p>
+      )}
+      <button className="ui-button ui-button--primary" type="submit" disabled={busy || !email.trim()}>
         {busy ? 'Enviando…' : 'Enviar link de redefinição'}
       </button>
-      <p style={{ fontSize: '0.9rem', marginTop: '1rem' }}>
+      <p className="ui-auth__link">
         <Link href="/entrar">Voltar para o login</Link>
       </p>
     </form>

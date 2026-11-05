@@ -1,18 +1,19 @@
 import Link from 'next/link';
 import { redirect, notFound } from 'next/navigation';
 import { currentUser } from '@/lib/session.js';
-import { isAdministrator, isCoordinator } from '@/domain/auth/roles.js';
+import { canManageCapela, isCoordinator } from '@/domain/auth/roles.js';
 import { getCelebration } from '@/services/celebrations.js';
 import { searchSongs } from '@/services/songs.js';
 import { RepertoireBuilder } from '@/components/RepertoireBuilder.jsx';
 import { seasonLabel } from '@/domain/liturgy/seasons.js';
+import { Breadcrumbs } from '@/components/Breadcrumbs.jsx';
+import { Icon } from '@/components/Icon.jsx';
 
 export const metadata = { title: 'Roteiro musical · Coral Litúrgico' };
 
 export default async function RoteiroPage({ params }) {
   const user = await currentUser();
   if (!user) redirect('/entrar');
-  if (isAdministrator(user)) redirect('/admin');
 
   const { id } = await params;
   if (!isCoordinator(user)) redirect(`/celebracoes/${id}`);
@@ -24,20 +25,24 @@ export default async function RoteiroPage({ params }) {
     if (error.status === 404) notFound();
     throw error;
   }
-  // Ver uma celebração de capela fundada não dá direito de geri-la.
-  if (celebration.capelaId !== user.capelaId) redirect(`/celebracoes/${id}`);
+  // Ver uma celebração de outra capela não dá direito de geri-la.
+  if (!canManageCapela(user, celebration.capela)) redirect(`/celebracoes/${id}`);
   // Acervo inteiro: a escolha do coordenador não deve ficar presa ao filtro.
   const songs = await searchSongs({ limit: 200 });
 
   return (
     <>
-      <div className="page-head">
-        <div className="grow">
-          <p style={{ margin: 0, fontSize: '0.85rem' }}>
-            <Link href={`/celebracoes/${id}`}>← {celebration.title}</Link>
-          </p>
-          <h1>Roteiro musical</h1>
-          <p>
+      <Breadcrumbs
+        items={[
+          { href: '/agenda', label: 'Agenda' },
+          { href: `/celebracoes/${id}`, label: celebration.title },
+          { label: 'Roteiro' },
+        ]}
+      />
+      <div className="ui-page-head">
+        <div>
+          <h1 className="ui-heading-large">Roteiro musical</h1>
+          <p className="ui-subtle">
             {new Date(celebration.date).toLocaleDateString('pt-BR', {
               dateStyle: 'long',
               timeZone: 'UTC',
@@ -48,9 +53,13 @@ export default async function RoteiroPage({ params }) {
       </div>
 
       {songs.length === 0 ? (
-        <p className="empty">
-          O acervo está vazio. <Link href="/acervo/nova">Cadastre a primeira música.</Link>
-        </p>
+        <div className="ui-empty">
+          <Icon name="audio" size={32} />
+          <p>O acervo está vazio.</p>
+          <Link className="ui-button ui-button--primary" href="/acervo/nova">
+            Cadastrar a primeira música
+          </Link>
+        </div>
       ) : (
         <RepertoireBuilder
           celebrationId={id}
@@ -59,6 +68,7 @@ export default async function RoteiroPage({ params }) {
             title: song.title,
             originalKey: song.originalKey,
             moments: song.moments,
+            tags: song.tags,
           }))}
           initial={celebration.repertoire.map((item) => ({
             moment: item.moment,

@@ -7,35 +7,65 @@ import {
   assertCan,
   AuthorizationError,
   isCoordinator,
-  isAdministrator,
+  isOwner,
+  actorLabel,
+  toActor,
   roleLabel,
   canManageCapela,
   assertManagesCapela,
+  assertOwner,
 } from '@/domain/auth/roles.js';
 
-const administrador = { id: 'u0', role: 'ADMINISTRADOR', capelaId: null };
-const coordenador = { id: 'u1', role: 'COORDENADOR', capelaId: 'capela-1' };
-const musico = { id: 'u2', role: 'MUSICO', capelaId: 'capela-1' };
+const dono = toActor({ id: 'u0', isOwner: true });
+const coordenador = toActor({
+  id: 'u1',
+  memberships: [{ capelaId: 'capela-1', role: 'COORDENADOR' }],
+});
+const musico = toActor({ id: 'u2', memberships: [{ capelaId: 'capela-1', role: 'MUSICO' }] });
 
 describe('catálogo de papéis', () => {
-  it('define Administrador, Coordenador e Músico', () => {
-    expect(ROLES.map((r) => r.id)).toEqual(['ADMINISTRADOR', 'COORDENADOR', 'MUSICO']);
-    expect(roleLabel('MUSICO')).toBe('Músico');
-    expect(roleLabel('ADMINISTRADOR')).toBe('Administrador');
-  });
-
-  it('nunca deixa Administrador entre os papéis atribuíveis pela interface', () => {
+  it('define Coordenador e Músico, ambos atribuíveis', () => {
+    expect(ROLES.map((r) => r.id)).toEqual(['COORDENADOR', 'MUSICO']);
     expect(ASSIGNABLE_ROLES.map((r) => r.id)).toEqual(['COORDENADOR', 'MUSICO']);
+    expect(roleLabel('MUSICO')).toBe('Músico');
   });
 
-  it('identifica o coordenador e o administrador', () => {
+  it('identifica o coordenador e o dono', () => {
     expect(isCoordinator(coordenador)).toBe(true);
     expect(isCoordinator(musico)).toBe(false);
     expect(isCoordinator(null)).toBe(false);
 
-    expect(isAdministrator(administrador)).toBe(true);
-    expect(isAdministrator(coordenador)).toBe(false);
-    expect(isAdministrator(null)).toBe(false);
+    expect(isOwner(dono)).toBe(true);
+    expect(isOwner(coordenador)).toBe(false);
+    expect(isOwner(null)).toBe(false);
+  });
+
+  it('mostra o rótulo de quem está logado', () => {
+    expect(actorLabel(dono)).toBe('Dono');
+    expect(actorLabel(coordenador)).toBe('Coordenador');
+    expect(actorLabel(musico)).toBe('Músico');
+  });
+});
+
+describe('toActor', () => {
+  it('é coordenador se coordena ao menos uma capela', () => {
+    const misto = toActor({
+      memberships: [
+        { capelaId: 'a', role: 'MUSICO' },
+        { capelaId: 'b', role: 'COORDENADOR' },
+      ],
+    });
+    expect(misto.role).toBe('COORDENADOR');
+    expect(misto.capelaIds).toEqual(['a', 'b']);
+  });
+
+  it('sem vínculos é músico, sem capelas', () => {
+    expect(toActor({})).toMatchObject({ role: 'MUSICO', capelaIds: [], isOwner: false });
+  });
+
+  it('o dono é coordenador mesmo sem vínculo, e NULL do banco vira false', () => {
+    expect(toActor({ isOwner: true }).role).toBe('COORDENADOR');
+    expect(toActor({ isOwner: null }).isOwner).toBe(false);
   });
 });
 
@@ -47,16 +77,12 @@ describe('can', () => {
     expect(can(coordenador, ACTIONS.MANAGE_USERS)).toBe(true);
   });
 
-  it('não deixa o coordenador fundar capelas — isso é só do administrador', () => {
+  it('não deixa o coordenador criar capelas — isso é só do dono', () => {
     expect(can(coordenador, ACTIONS.MANAGE_CAPELA)).toBe(false);
   });
 
-  it('deixa o administrador fundar capelas e conceder coordenações, nada mais', () => {
-    expect(can(administrador, ACTIONS.MANAGE_CAPELA)).toBe(true);
-    expect(can(administrador, ACTIONS.MANAGE_USERS)).toBe(true);
-    expect(can(administrador, ACTIONS.MANAGE_CELEBRATION)).toBe(false);
-    expect(can(administrador, ACTIONS.MANAGE_SONG)).toBe(false);
-    expect(can(administrador, ACTIONS.VIEW_CALENDAR)).toBe(false);
+  it('deixa o dono criar capelas e fazer tudo que o coordenador faz', () => {
+    for (const action of Object.values(ACTIONS)) expect(can(dono, action)).toBe(true);
   });
 
   it('deixa o músico apenas visualizar escalas e cifras', () => {
@@ -103,15 +129,15 @@ describe('assertCan', () => {
 
 describe('canManageCapela / assertManagesCapela', () => {
   const capela = { id: 'capela-1', createdById: null };
-  const capelaFundadaPeloCoordenadorMasNaoMorada = { id: 'capela-2', createdById: coordenador.id };
+  const capelaFundadaPeloCoordenador = { id: 'capela-2', createdById: coordenador.id };
   const capelaAlheia = { id: 'capela-9', createdById: 'outro-user' };
 
-  it('o coordenador administra a própria capela-casa', () => {
+  it('o coordenador administra a capela que coordena', () => {
     expect(canManageCapela(coordenador, capela)).toBe(true);
   });
 
-  it('o coordenador não administra uma capela só porque a fundou — só a de casa', () => {
-    expect(canManageCapela(coordenador, capelaFundadaPeloCoordenadorMasNaoMorada)).toBe(false);
+  it('o coordenador não administra uma capela só porque a fundou', () => {
+    expect(canManageCapela(coordenador, capelaFundadaPeloCoordenador)).toBe(false);
   });
 
   it('o coordenador não administra capela alheia', () => {
@@ -122,14 +148,32 @@ describe('canManageCapela / assertManagesCapela', () => {
     expect(canManageCapela(musico, capela)).toBe(false);
   });
 
-  it('nega quando não há capela', () => {
-    expect(canManageCapela(coordenador, null)).toBe(false);
-    expect(canManageCapela(administrador, null)).toBe(false);
+  it('coordenar uma capela não dá poder onde a pessoa é só músico', () => {
+    const misto = toActor({
+      memberships: [
+        { capelaId: 'capela-1', role: 'COORDENADOR' },
+        { capelaId: 'capela-2', role: 'MUSICO' },
+      ],
+    });
+    expect(canManageCapela(misto, { id: 'capela-1' })).toBe(true);
+    expect(canManageCapela(misto, { id: 'capela-2' })).toBe(false);
   });
 
-  it('o administrador administra qualquer capela, mesmo sem ser dono nem morador', () => {
-    expect(canManageCapela(administrador, capela)).toBe(true);
-    expect(canManageCapela(administrador, capelaAlheia)).toBe(true);
+  it('nega quando não há capela ou usuário', () => {
+    expect(canManageCapela(coordenador, null)).toBe(false);
+    expect(canManageCapela(dono, null)).toBe(false);
+    expect(canManageCapela(null, capela)).toBe(false);
+  });
+
+  it('o dono administra qualquer capela, sem vínculo com ela', () => {
+    expect(canManageCapela(dono, capela)).toBe(true);
+    expect(canManageCapela(dono, capelaAlheia)).toBe(true);
+  });
+
+  it('assertOwner barra quem não é dono', () => {
+    expect(() => assertOwner(dono)).not.toThrow();
+    expect(() => assertOwner(coordenador)).toThrow(AuthorizationError);
+    expect(() => assertOwner(null)).toThrow(AuthorizationError);
   });
 
   it('assertManagesCapela lança 401 sem usuário e 403 fora da capela', () => {

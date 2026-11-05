@@ -26,15 +26,13 @@ async function main() {
 
   const passwordHash = await bcrypt.hash(SENHA_PADRAO, 10);
 
-  // O Administrador não pertence a nenhuma capela: funda capelas e concede
-  // coordenações, mas não opera agenda/acervo diretamente.
+  // O dono coordena todas as capelas sem precisar de vínculo com cada uma.
   await prisma.user.create({
     data: {
-      name: 'Administrador',
+      name: 'Dono do sistema',
       email: 'admin@paroquia.org',
       passwordHash,
-      voiceOrInstrument: 'Administração',
-      role: 'ADMINISTRADOR',
+      isOwner: true,
     },
   });
 
