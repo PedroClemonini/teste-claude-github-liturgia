@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ActionMenu } from './ActionMenu.jsx';
 import { ConfirmModal } from './ConfirmModal.jsx';
 import { Icon } from './Icon.jsx';
 
@@ -32,10 +33,13 @@ export function DeleteSongButton({ songId, title }) {
 
   return (
     <>
-      <button type="button" className="ui-button ui-button--danger" disabled={busy} onClick={() => setConfirming(true)}>
-        <Icon name="delete" />
-        {busy ? 'Removendo…' : 'Remover do acervo'}
-      </button>
+      <ActionMenu
+        label="Mais ações"
+        triggerClassName="ui-button ui-button--subtle ui-button--icon"
+        items={[{ label: busy ? 'Removendo…' : 'Remover do acervo', icon: 'delete', danger: true, onSelect: () => setConfirming(true) }]}
+      >
+        <Icon name="show-more-vertical" />
+      </ActionMenu>
       {error && (
         <p className="ui-error" role="alert">
           {error}

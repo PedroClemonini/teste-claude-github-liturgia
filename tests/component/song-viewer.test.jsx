@@ -72,11 +72,24 @@ describe('SongViewer', () => {
     expect(chords()).toEqual(['G', 'C', 'G']);
   });
 
-  it('mostra título, autor e o tom original como referência', () => {
-    render(<SongViewer song={song} performanceKey="A" />);
+  it('mostra título e autor, e o tom original só quando é outro', async () => {
+    const user = userEvent.setup();
+    render(<SongViewer song={song} />);
     expect(screen.getByText('Pai Nosso')).toBeTruthy();
     expect(screen.getByText(/Tradicional/)).toBeTruthy();
+    expect(screen.queryByText(/original: G/i)).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: /subir meio tom/i }));
     expect(screen.getByText(/original: G/i)).toBeTruthy();
+  });
+
+  it('marca o modo somente letra como ligado', async () => {
+    const user = userEvent.setup();
+    render(<SongViewer song={song} />);
+    const botao = screen.getByRole('button', { name: /somente letra/i });
+    expect(botao.getAttribute('aria-pressed')).toBe('false');
+    await user.click(botao);
+    expect(screen.getByRole('button', { name: /mostrar cifra/i }).getAttribute('aria-pressed')).toBe('true');
   });
 });
 
@@ -108,8 +121,8 @@ describe('SongViewer embutido no roteiro', () => {
     // Os controles de tom e a cifra continuam presentes.
     expect(screen.getByTestId('current-key').textContent).toBe('G');
     expect(chords()).toEqual(['G', 'C', 'G']);
-    // A referência de tom original permanece: é o que o músico precisa saber.
-    expect(screen.getByText(/original: G/i)).toBeTruthy();
+    // O painel já mostra o tom: o original só aparece quando for outro.
+    expect(screen.queryByText(/original: G/i)).toBeNull();
   });
 
   it('mostra título e momento na tela dedicada da música', () => {

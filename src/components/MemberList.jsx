@@ -4,17 +4,17 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ASSIGNABLE_ROLES, roleLabel } from '@/domain/auth/roles.js';
+import { ActionMenu } from './ActionMenu.jsx';
 import { ConfirmModal } from './ConfirmModal.jsx';
 import { Icon } from './Icon.jsx';
-import { Select } from './Select.jsx';
-
-const ROLE_OPTIONS = ASSIGNABLE_ROLES.map((role) => ({ value: role.id, label: role.label }));
 
 /**
- * Integrantes de uma capela, com o papel de cada um nela. Com `canManage`, quem
- * vê pode trocar o papel ou tirar a pessoa dali; sem isso, só consulta.
+ * Integrantes de uma capela, com o papel de cada um nela. O papel é só texto, e
+ * as ações ficam num menu, sempre com confirmação: assim rolar a lista no
+ * celular nunca muda permissões nem apaga nada por acidente.
  *
- * `canEditAccounts` (só o dono) mostra as ações de editar e apagar a conta.
+ * `canManage` libera trocar o papel e tirar da capela; `canEditAccounts` (só o
+ * dono) libera editar e apagar a conta.
  * `capelaId` nulo é a lista de contas sem nenhuma capela.
  *
  * @param {{members: object[], capelaId: string|null, currentUserId: string, canManage?: boolean, canEditAccounts?: boolean}} props
@@ -43,16 +43,23 @@ export function MemberList({ members, capelaId, currentUserId, canManage = false
   const temAcoes = canManage || canEditAccounts;
 
   const trocarPapel = (member, role) =>
-    executar(
-      member.id,
-      `/api/members/${member.id}/role`,
-      {
-        method: 'PATCH',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ capelaId, role }),
-      },
-      'Não foi possível alterar o papel.',
-    );
+    setPending({
+      title: `Tornar ${member.name} ${roleLabel(role)}?`,
+      body: 'Isso muda o que a pessoa pode fazer nesta capela.',
+      confirmLabel: `Tornar ${roleLabel(role)}`,
+      safe: true,
+      run: () =>
+        executar(
+          member.id,
+          `/api/members/${member.id}/role`,
+          {
+            method: 'PATCH',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ capelaId, role }),
+          },
+          'Não foi possível alterar o papel.',
+        ),
+    });
 
   const tirarDaCapela = (member, capelaName) =>
     setPending({
@@ -109,6 +116,31 @@ export function MemberList({ members, capelaId, currentUserId, canManage = false
               const vinculo = member.memberships.find((membership) => membership.capelaId === capelaId);
               const podeTirar = canManage && vinculo && (member.id !== currentUserId || canEditAccounts);
               const podeApagar = canEditAccounts && member.id !== currentUserId && !member.isOwner;
+              const outroPapel = vinculo?.role === 'COORDENADOR' ? 'MUSICO' : 'COORDENADOR';
+              const acoes = [
+                canEditAccounts && {
+                  label: 'Editar',
+                  icon: 'edit',
+                  href: `/capelas/membros/${member.id}/editar`,
+                },
+                canManage &&
+                  vinculo && {
+                    label: `Tornar ${roleLabel(outroPapel)}`,
+                    icon: 'people-group',
+                    onSelect: () => trocarPapel(member, outroPapel),
+                  },
+                podeTirar && {
+                  label: 'Tirar da capela',
+                  icon: 'person-remove',
+                  onSelect: () => tirarDaCapela(member, vinculo.capelaName),
+                },
+                podeApagar && {
+                  label: 'Apagar conta',
+                  icon: 'delete',
+                  danger: true,
+                  onSelect: () => apagarConta(member),
+                },
+              ].filter(Boolean);
               return (
                 <tr key={member.id}>
                   <td>
@@ -133,52 +165,25 @@ export function MemberList({ members, capelaId, currentUserId, canManage = false
                   <td data-label="Vozes e instrumentos">{member.instruments.join(', ') || '—'}</td>
                   {capelaId && (
                     <td data-label="Papel">
-                      {vinculo && canManage ? (
-                        <Select
-                          compact
-                          label={`Papel de ${member.name}`}
-                          value={vinculo.role}
-                          options={ROLE_OPTIONS}
-                          disabled={busyId === member.id}
-                          onChange={(role) => trocarPapel(member, role)}
-                        />
-                      ) : (
-                        <span className="ui-lozenge">{vinculo ? roleLabel(vinculo.role) : '—'}</span>
-                      )}
+                      <span
+                        className="ui-lozenge"
+                        data-type={vinculo?.role === 'COORDENADOR' ? 'MISSA_COMUM' : undefined}
+                      >
+                        {vinculo ? roleLabel(vinculo.role) : '—'}
+                      </span>
                     </td>
                   )}
                   {temAcoes && (
-                    <td>
-                      <span className="ui-button-group ui-team__actions">
-                        {canEditAccounts && (
-                          <Link className="ui-button" href={`/capelas/membros/${member.id}/editar`}>
-                            <Icon name="edit" />
-                            Editar
-                          </Link>
-                        )}
-                        {podeTirar && (
-                          <button
-                            type="button"
-                            className="ui-button ui-button--subtle"
-                            aria-label={`Tirar ${member.name} da capela`}
-                            disabled={busyId === member.id}
-                            onClick={() => tirarDaCapela(member, vinculo.capelaName)}
-                          >
-                            Tirar da capela
-                          </button>
-                        )}
-                        {podeApagar && (
-                          <button
-                            type="button"
-                            className="ui-button ui-button--danger"
-                            disabled={busyId === member.id}
-                            onClick={() => apagarConta(member)}
-                          >
-                            <Icon name="delete" />
-                            Apagar conta
-                          </button>
-                        )}
-                      </span>
+                    <td className="ui-team__actions">
+                      {acoes.length > 0 && (
+                        <ActionMenu
+                          label={`Ações de ${member.name}`}
+                          items={acoes}
+                          triggerClassName="ui-button ui-button--subtle ui-button--icon"
+                        >
+                          <Icon name="show-more-vertical" />
+                        </ActionMenu>
+                      )}
                     </td>
                   )}
                 </tr>
@@ -192,6 +197,7 @@ export function MemberList({ members, capelaId, currentUserId, canManage = false
         <ConfirmModal
           title={pending.title}
           confirmLabel={pending.confirmLabel}
+          safe={pending.safe}
           onCancel={() => setPending(null)}
           onConfirm={() => {
             setPending(null);

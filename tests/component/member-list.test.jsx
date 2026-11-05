@@ -29,66 +29,91 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
+const abrir = (user, nome = 'Maria') => user.click(screen.getByRole('button', { name: `Ações de ${nome}` }));
+const item = (nome) => screen.getByRole('menuitem', { name: nome });
+
 describe('MemberList', () => {
-  it('sem permissão na capela, só mostra o papel', () => {
-    lista({ canManage: false, capelaId: 'c2' });
+  it('o papel é só texto: nada na lista muda com um toque', () => {
+    lista();
     expect(screen.queryByRole('combobox')).toBeNull();
-    expect(screen.queryByRole('button', { name: /Tirar Maria/ })).toBeNull();
+    expect(screen.getByText('Músico')).toBeTruthy();
+  });
+
+  it('sem permissão, não há menu de ações', () => {
+    lista({ canManage: false, capelaId: 'c2' });
+    expect(screen.queryByRole('button', { name: 'Ações de Maria' })).toBeNull();
     expect(screen.getByText('Coordenador')).toBeTruthy();
   });
 
   it('mostra o papel da capela escolhida, não o das outras', () => {
     lista({ capelaId: 'c2' });
-    expect(screen.getByRole('combobox', { name: /Papel de Maria/ }).textContent).toContain('Coordenador');
+    expect(screen.getByText('Coordenador')).toBeTruthy();
+    expect(screen.queryByText('Músico')).toBeNull();
   });
 
-  it('na lista sem capela não há coluna de papel', () => {
+  it('na lista sem capela não há coluna de papel, mas o dono edita', async () => {
+    const user = userEvent.setup();
     lista({ capelaId: null, canManage: false, canEditAccounts: true, members: [{ ...maria, memberships: [] }] });
     expect(screen.queryByRole('columnheader', { name: 'Papel' })).toBeNull();
-    expect(screen.getByRole('link', { name: 'Editar' })).toBeTruthy();
+    await abrir(user);
+    expect(item('Editar').getAttribute('href')).toBe('/capelas/membros/u1/editar');
   });
 
-  it('coordenador não tira a si mesmo', () => {
+  it('coordenador troca o papel, mas não tira a si mesmo', async () => {
+    const user = userEvent.setup();
     lista({ currentUserId: 'u1' });
-    expect(screen.queryByRole('button', { name: /Tirar Maria/ })).toBeNull();
+    await abrir(user);
+    expect(screen.queryByRole('menuitem', { name: 'Tirar da capela' })).toBeNull();
+    expect(item('Tornar Coordenador')).toBeTruthy();
   });
 
-  it('troca o papel naquela capela', async () => {
+  it('coordenador não vê editar nem apagar conta', async () => {
     const user = userEvent.setup();
     lista();
-    await user.click(screen.getByRole('combobox', { name: /Papel de Maria/ }));
-    await user.click(screen.getByRole('option', { name: 'Coordenador' }));
+    await abrir(user);
+    expect(screen.queryByRole('menuitem', { name: 'Editar' })).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: 'Apagar conta' })).toBeNull();
+  });
 
+  it('trocar o papel pede confirmação, e só então grava', async () => {
+    const user = userEvent.setup();
+    lista();
+    await abrir(user);
+    await user.click(item('Tornar Coordenador'));
+    expect(global.fetch).not.toHaveBeenCalled();
+
+    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Tornar Coordenador' }));
     const [url, init] = global.fetch.mock.calls[0];
     expect(url).toBe('/api/members/u1/role');
     expect(JSON.parse(init.body)).toEqual({ capelaId: 'c1', role: 'COORDENADOR' });
     expect(refresh).toHaveBeenCalled();
   });
 
-  it('se a troca falhar, mostra o erro e mantém o papel anterior', async () => {
+  it('se a troca falhar, mostra o erro e mantém o papel', async () => {
     global.fetch = vi.fn(async () => ({ ok: false, json: async () => ({ error: 'Sem permissão.' }) }));
     const user = userEvent.setup();
     lista();
-    const menu = screen.getByRole('combobox', { name: /Papel de Maria/ });
-    await user.click(menu);
-    await user.click(screen.getByRole('option', { name: 'Coordenador' }));
+    await abrir(user);
+    await user.click(item('Tornar Coordenador'));
+    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Tornar Coordenador' }));
 
-    expect(await screen.findByRole('alert')).toBeTruthy();
-    expect(menu.textContent).toContain('Músico');
+    expect(await screen.findByText('Sem permissão.')).toBeTruthy();
+    expect(screen.getByText('Músico')).toBeTruthy();
   });
 
   it('só tira da capela depois de confirmar no modal', async () => {
     const user = userEvent.setup();
     lista();
-    await user.click(screen.getByRole('button', { name: /Tirar Maria da capela/ }));
+    await abrir(user);
+    await user.click(item('Tirar da capela'));
 
     const modal = screen.getByRole('alertdialog');
-    expect(global.fetch).not.toHaveBeenCalled();
     await user.click(within(modal).getByRole('button', { name: 'Cancelar' }));
     expect(global.fetch).not.toHaveBeenCalled();
     expect(screen.queryByRole('alertdialog')).toBeNull();
 
-    await user.click(screen.getByRole('button', { name: /Tirar Maria da capela/ }));
+    await abrir(user);
+    await user.click(item('Tirar da capela'));
     await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Tirar da capela' }));
     expect(global.fetch.mock.calls[0][0]).toBe('/api/members/u1/capela?capelaId=c1');
   });
@@ -96,22 +121,22 @@ describe('MemberList', () => {
   it('Esc cancela a confirmação', async () => {
     const user = userEvent.setup();
     lista();
-    await user.click(screen.getByRole('button', { name: /Tirar Maria da capela/ }));
+    await abrir(user);
+    await user.click(item('Tirar da capela'));
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('alertdialog')).toBeNull();
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it('apagar conta só aparece para o dono, e nunca para a conta do dono', () => {
-    lista();
-    expect(screen.queryByRole('button', { name: 'Apagar conta' })).toBeNull();
-    cleanup();
-
+  it('apagar conta é do dono, e nunca da conta do dono', async () => {
+    const user = userEvent.setup();
     lista({ canEditAccounts: true });
-    expect(screen.getByRole('button', { name: 'Apagar conta' })).toBeTruthy();
+    await abrir(user);
+    expect(item('Apagar conta').className).toContain('danger');
     cleanup();
 
     lista({ canEditAccounts: true, members: [{ ...maria, isOwner: true }] });
-    expect(screen.queryByRole('button', { name: 'Apagar conta' })).toBeNull();
+    await abrir(user);
+    expect(screen.queryByRole('menuitem', { name: 'Apagar conta' })).toBeNull();
   });
 });

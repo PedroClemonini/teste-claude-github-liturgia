@@ -24,7 +24,7 @@ const normalize = (text) =>
  * @param {{
  *   label: string,
  *   name?: string,
- *   options: {value: string, label: string, group?: string, keywords?: string}[],
+ *   options: {value: string, label: string, group?: string, keywords?: string, action?: boolean}[],
  *   defaultValue?: string,
  *   value?: string,
  *   onChange?: (value: string) => void,
@@ -34,7 +34,8 @@ const normalize = (text) =>
  * }} props `compact` é para uso em tabelas: o rótulo some da tela (continua
  * para leitores). Com `value`, quem usa manda no valor: se a gravação falhar,
  * o menu não fica mostrando o errado. `group` agrupa opções vizinhas, e
- * `keywords` entra na busca sem aparecer na tela.
+ * `keywords` entra na busca sem aparecer na tela. `action` destaca uma opção que
+ * faz algo em vez de escolher um valor, como acrescentar um item à lista.
  */
 export function Select({
   label,
@@ -233,7 +234,11 @@ export function Select({
                     id={optionId(index)}
                     role="option"
                     aria-selected={isSelected}
-                    className={`ui-select__option ${index === active ? 'ui-select__option--active' : ''}`}
+                    className={[
+                      'ui-select__option',
+                      index === active ? 'ui-select__option--active' : '',
+                      option.action ? 'ui-select__option--action' : '',
+                    ].join(' ')}
                     onPointerMove={() => setActive(index)}
                     // Sem isso o botão perderia o foco ao tocar na lista.
                     onMouseDown={(event) => event.preventDefault()}

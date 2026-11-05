@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { buildMonthGrid, WEEKDAYS, celebrationTypeLabel } from '@/domain/calendar/grid.js';
-import { fallbackColor, LITURGY_COLORS } from '@/domain/liturgy/daily.js';
+import { displaySeason, fallbackColor, LITURGY_COLORS } from '@/domain/liturgy/daily.js';
 import { seasonLabel } from '@/domain/liturgy/seasons.js';
 import { Icon } from './Icon.jsx';
 
@@ -20,9 +20,9 @@ const hora = (date) =>
  * `liturgyColors` traz a cor oficial dos dias já guardados; nos demais, o ponto
  * usa a cor do tempo litúrgico calculado.
  *
- * @param {{year: number, month: number, celebrations: object[], today?: string, liturgyColors?: Record<string, {cor: string, liturgia: string}>}} props
+ * @param {{year: number, month: number, celebrations: object[], today?: string, liturgyColors?: Record<string, {cor: string, liturgia: string}>, currentSeason?: string}} props
  */
-export function CalendarBoard({ year, month, celebrations, today, liturgyColors = {} }) {
+export function CalendarBoard({ year, month, celebrations, today, liturgyColors = {}, currentSeason }) {
   const weeks = buildMonthGrid(year, month, celebrations);
   const days = weeks.flat();
   // Todo dia tem o ponto da cor litúrgica; o nome aparece só onde o tempo começa
@@ -99,14 +99,19 @@ export function CalendarBoard({ year, month, celebrations, today, liturgyColors 
       </div>
 
       <div className="agenda-list--mobile">
-        <AgendaList celebrations={celebrations} />
+        <AgendaList celebrations={celebrations} currentSeason={currentSeason} />
       </div>
     </>
   );
 }
 
-/** Lista cronológica das celebrações, com o indicador de roteiro. */
-export function AgendaList({ celebrations }) {
+/**
+ * Lista cronológica das celebrações, com o indicador de roteiro. O tempo
+ * litúrgico só aparece no item que foge de `currentSeason`, já mostrado no topo.
+ *
+ * @param {{celebrations: object[], currentSeason?: string}} props
+ */
+export function AgendaList({ celebrations, currentSeason }) {
   if (celebrations.length === 0) {
     return (
       <div className="ui-empty">
@@ -122,9 +127,10 @@ export function AgendaList({ celebrations }) {
         const date = new Date(celebration.date);
         const weekday = date.toLocaleDateString('pt-BR', { weekday: 'short', timeZone: 'UTC' });
         const month = date.toLocaleDateString('pt-BR', { month: 'short', timeZone: 'UTC' });
+        const season = displaySeason(celebration);
         return (
           <li key={celebration.id}>
-            <Link className="ui-list-item" href={`/celebracoes/${celebration.id}`}>
+            <Link className="ui-list-item ui-list-item--link" href={`/celebracoes/${celebration.id}`}>
               <span className="ui-date">
                 <strong>{date.getUTCDate()}</strong>
                 {month.replace('.', '')}
@@ -132,13 +138,14 @@ export function AgendaList({ celebrations }) {
               <span className="ui-list-item__text">
                 <span className="ui-list-item__title">{celebration.title}</span>
                 <span className="ui-subtle">
-                  {weekday.replace('.', '')}, {hora(celebration.date)} · {seasonLabel(celebration.season)}
+                  {weekday.replace('.', '')}, {hora(celebration.date)}
+                  {season !== currentSeason && ` · ${seasonLabel(season)}`}
                 </span>
                 <span className="ui-list-item__meta">
                   <span className="ui-lozenge" data-type={celebration.type}>
                     {celebrationTypeLabel(celebration.type)}
                   </span>
-                  {typeof celebration.songCount === 'number' && (
+                  {celebration.songCount > 0 && (
                     <span className="ui-list-item__songs">
                       <Icon name="audio" size={12} />
                       {celebration.songCount} {celebration.songCount === 1 ? 'canto' : 'cantos'}
@@ -146,6 +153,7 @@ export function AgendaList({ celebrations }) {
                   )}
                 </span>
               </span>
+              <Icon name="chevron-right" />
             </Link>
           </li>
         );

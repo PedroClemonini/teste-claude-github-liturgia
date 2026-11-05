@@ -7,7 +7,7 @@ import { LITURGICAL_MOMENTS, momentLabel } from '@/domain/liturgy/moments.js';
 import { LITURGICAL_SEASONS } from '@/domain/liturgy/seasons.js';
 import { isCoordinator } from '@/domain/auth/roles.js';
 import { Icon } from '@/components/Icon.jsx';
-import { Select } from '@/components/Select.jsx';
+import { SongFilters } from '@/components/SongFilters.jsx';
 
 /** Mais que isso quebra a linha; o restante aparece como "+N". */
 const MAX_MOMENTS = 3;
@@ -45,55 +45,29 @@ export default async function AcervoPage({ searchParams }) {
 
   return (
     <>
-      <div className="ui-page-head">
-        <div>
-          <h1 className="ui-heading-large">Acervo</h1>
-          <p className="ui-subtle">Busque por título, trecho da letra ou adequação litúrgica.</p>
-        </div>
+      <div className="dashboard__head">
+        <h1 className="ui-heading-large">Acervo</h1>
         {isCoordinator(user) && (
-          <Link className="ui-button ui-button--primary" href="/acervo/nova">
+          <Link className="ui-button ui-button--primary ui-fab" href="/acervo/nova" title="Nova música">
             <Icon name="add" />
-            Nova música
+            <span className="ui-fab__label">Nova música</span>
           </Link>
         )}
       </div>
 
-      {/* A chave recria o formulário quando a URL muda (ex.: Limpar filtros, que
-          navega sem recarregar), senão os campos ficariam com os valores antigos. */}
-      <form
-        key={`${q}|${moment}|${season}|${tag}`}
-        className={tags.length > 0 ? 'ui-filters ui-filters--tags' : 'ui-filters'}
-        method="get"
-        action="/acervo"
-        role="search"
-      >
-        <label className="ui-field">
-          <span>Título, trecho da letra ou #tag</span>
-          <span className="ui-search">
-            <Icon name="search" />
-            <input name="q" defaultValue={q} placeholder="ex.: estais no céu" />
-          </span>
-        </label>
-
-        <Select label="Momento" name="momento" defaultValue={moment} options={comTodos(LITURGICAL_MOMENTS)} />
-        <Select label="Tempo litúrgico" name="tempo" defaultValue={season} options={comTodos(LITURGICAL_SEASONS)} />
-        {tags.length > 0 && (
-          <Select
-            searchable
-            label="Tag"
-            name="tag"
-            defaultValue={tag}
-            options={[
-              { value: '', label: 'Todas' },
-              ...tags.map((item) => ({ value: item, label: formatTag(item) })),
-            ]}
-          />
-        )}
-
-        <button className="ui-button" type="submit">
-          Buscar
-        </button>
-      </form>
+      <SongFilters
+        q={q}
+        moment={moment}
+        season={season}
+        tag={tag}
+        momentOptions={comTodos(LITURGICAL_MOMENTS)}
+        seasonOptions={comTodos(LITURGICAL_SEASONS)}
+        tagOptions={
+          tags.length > 0
+            ? [{ value: '', label: 'Todas' }, ...tags.map((item) => ({ value: item, label: formatTag(item) }))]
+            : []
+        }
+      />
 
       <div className="ui-results-head">
         <p className="ui-subtle" role="status">
@@ -118,15 +92,7 @@ export default async function AcervoPage({ searchParams }) {
             <li key={song.id}>
               <Link className="ui-song" href={`/acervo/${song.id}`}>
                 <span className="ui-song__main">
-                  <span className="ui-song__title">
-                    {song.title}
-                    {song.audioUrl && (
-                      <span className="ui-song__audio" title="Tem link para ouvir">
-                        <Icon name="audio" size={12} />
-                        <span className="ui-visually-hidden">Tem link para ouvir</span>
-                      </span>
-                    )}
-                  </span>
+                  <span className="ui-song__title">{song.title}</span>
                   <span className="ui-song__snippet">
                     {[song.composer, song.plainLyrics.slice(0, 120)].filter(Boolean).join(' · ')}
                   </span>
@@ -135,6 +101,7 @@ export default async function AcervoPage({ searchParams }) {
                   )}
                 </span>
                 <span className="ui-song__moments">
+                  {song.audioUrl && <span className="ui-tag">Com áudio</span>}
                   {song.moments.slice(0, MAX_MOMENTS).map((item) => (
                     <span className="ui-lozenge" key={item}>
                       {momentLabel(item)}

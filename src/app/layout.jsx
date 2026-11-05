@@ -59,9 +59,6 @@ export default async function RootLayout({ children }) {
 
           <main className="main">{children}</main>
 
-          <footer className="footer">
-            Feito para servir à liturgia — cifras em ChordPro, sem PDF.
-          </footer>
         </div>
       </body>
     </html>

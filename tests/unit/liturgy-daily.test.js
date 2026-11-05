@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   addDaysIso,
+  displaySeason,
   daysUntilYearEnd,
   isIsoDate,
   isSaturdayMass,
@@ -94,5 +95,28 @@ describe('missa de sábado', () => {
     expect(isSaturdayMass(missa('2026-11-07T19:00:00.000Z', { type: 'ENSAIO' }))).toBe(false);
     expect(liturgyChoiceFor(missa('2026-11-08T19:00:00.000Z'))).toBeNull();
     expect(liturgyDateFor(missa('2026-11-08T19:00:00.000Z'))).toBe('2026-11-08');
+  });
+});
+
+describe('displaySeason', () => {
+  const missa = (date, extra = {}) => ({
+    date: new Date(date),
+    type: 'MISSA_COMUM',
+    season: 'TEMPO_COMUM',
+    liturgyChoice: null,
+    ...extra,
+  });
+
+  it('na vigília do Advento mostra o Advento', () => {
+    expect(displaySeason(missa('2026-11-28T19:00:00.000Z'))).toBe('ADVENTO');
+  });
+
+  it('no sábado de manhã, ou escolhendo o sábado, mantém o tempo do dia', () => {
+    expect(displaySeason(missa('2026-11-28T10:00:00.000Z'))).toBe('TEMPO_COMUM');
+    expect(displaySeason(missa('2026-11-28T19:00:00.000Z', { liturgyChoice: 'SABADO' }))).toBe('TEMPO_COMUM');
+  });
+
+  it('nos outros dias respeita o tempo gravado, mesmo escolhido à mão', () => {
+    expect(displaySeason(missa('2026-11-29T10:00:00.000Z', { season: 'NATAL' }))).toBe('NATAL');
   });
 });

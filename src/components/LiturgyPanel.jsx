@@ -1,16 +1,46 @@
 'use client';
 
 /**
- * Liturgia do dia na Agenda: resumo sempre à vista e o texto completo recolhido.
+ * Liturgia do dia na Agenda: no computador, o texto completo; no celular, recolhido.
  * Quando há memória facultativa, abas trocam a celebração.
  */
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import Link from 'next/link';
 import { isoToDate, isSaturday, sortCelebrations } from '@/domain/liturgy/daily.js';
 import { Icon } from './Icon.jsx';
 
 const formatDate = (iso) =>
   isoToDate(iso).toLocaleDateString('pt-BR', { dateStyle: 'full', timeZone: 'UTC' });
+
+/** No computador o texto fica sempre à vista; o botão só existe no celular (CSS). */
+function FullText({ children }) {
+  const id = useId();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <button
+        type="button"
+        className="ui-liturgy__toggle"
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={() => setOpen(!open)}
+      >
+        <Icon name="chevron-right" />
+        {open ? 'Recolher a liturgia' : 'Ler a liturgia completa'}
+      </button>
+      <div className="ui-liturgy__text" id={id} data-open={open || undefined}>
+        {children}
+      </div>
+    </>
+  );
+}
+
+/** Dia da barra de navegação, como "quarta-feira 4". */
+const dayLabel = (iso) => {
+  const date = isoToDate(iso);
+  return `${date.toLocaleDateString('pt-BR', { weekday: 'long', timeZone: 'UTC' })} ${date.getUTCDate()}`;
+};
 
 function Prayer({ title, text }) {
   if (!text) return null;
@@ -44,18 +74,20 @@ function Reading({ reading }) {
  *   date: string,
  *   isToday: boolean,
  *   liturgy: object|null,
+ *   dayColor?: string,
  *   previousHref?: string,
  *   nextHref?: string,
  *   todayHref?: string,
  *   heading?: string,
  *   children?: import('react').ReactNode,
- * }} props Sem `previousHref`, não há navegação entre dias (tela do evento).
- * `children` entra logo abaixo do cabeçalho.
+ * }} props Com `previousHref`, mostra o dia com as setas; sem ele (tela do
+ * evento), não há navegação. `children` entra logo abaixo do cabeçalho.
  */
 export function LiturgyPanel({
   date,
   isToday = false,
   liturgy,
+  dayColor,
   previousHref,
   nextHref,
   todayHref,
@@ -70,34 +102,40 @@ export function LiturgyPanel({
     <section className="ui-liturgy" data-cor={current?.cor} aria-labelledby="liturgia-titulo">
       <div className="ui-liturgy__head">
         <p className="ui-liturgy__kicker">
-          {heading ?? (isToday ? 'Liturgia de hoje' : 'Liturgia')} · {formatDate(date)}
+          {heading && `${heading} · ${formatDate(date)}`}
+          {!heading && (isToday ? 'Liturgia de hoje' : `Liturgia de ${formatDate(date)}`)}
         </p>
-        {previousHref && (
-          <div className="ui-liturgy__nav">
-            {!isToday && (
-              <Link className="ui-button" href={todayHref}>
-                Hoje
-              </Link>
-            )}
-            <Link
-              className="ui-button ui-button--subtle ui-button--icon"
-              href={previousHref}
-              aria-label="Liturgia do dia anterior"
-              title="Dia anterior"
-            >
-              <Icon name="chevron-left" />
-            </Link>
-            <Link
-              className="ui-button ui-button--subtle ui-button--icon"
-              href={nextHref}
-              aria-label="Liturgia do dia seguinte"
-              title="Dia seguinte"
-            >
-              <Icon name="chevron-right" />
-            </Link>
-          </div>
+        {previousHref && !isToday && (
+          <Link className="ui-button" href={todayHref}>
+            Voltar para hoje
+          </Link>
         )}
       </div>
+
+      {previousHref && (
+        <nav className="ui-day-nav" aria-label="Escolher o dia da liturgia">
+          <Link
+            className="ui-button ui-button--subtle ui-button--icon"
+            href={previousHref}
+            aria-label="Liturgia do dia anterior"
+            title="Dia anterior"
+          >
+            <Icon name="chevron-left" />
+          </Link>
+          <span className="ui-day-nav__day" aria-current="date">
+            <span className="cor-dot" data-cor={dayColor} />
+            {dayLabel(date)}
+          </span>
+          <Link
+            className="ui-button ui-button--subtle ui-button--icon"
+            href={nextHref}
+            aria-label="Liturgia do dia seguinte"
+            title="Dia seguinte"
+          >
+            <Icon name="chevron-right" />
+          </Link>
+        </nav>
+      )}
 
       {children}
 
@@ -140,35 +178,30 @@ export function LiturgyPanel({
           )}
 
           {current.leituras.length > 0 && (
-            <ul className="ui-liturgy__readings">
+            <dl className="ui-liturgy__readings">
               {current.leituras.map((reading) => (
-                <li key={reading.ordem}>
-                  <span>{reading.rotulo}:</span> {reading.opcoes[0]?.referencia ?? '—'}
-                </li>
+                <div key={reading.ordem}>
+                  <dt>{reading.rotulo}</dt>
+                  <dd>{reading.opcoes[0]?.referencia ?? '—'}</dd>
+                </div>
               ))}
-            </ul>
+            </dl>
           )}
 
-          {/* A chave fecha o texto ao trocar de dia ou de celebração. */}
-          <details className="ui-liturgy__full" key={`${date}-${current.id}`}>
-            <summary>
-              <Icon name="chevron-right" />
-              Ler a liturgia completa
-            </summary>
-            <div className="ui-liturgy__text">
-              <Prayer title="Antífona de entrada" text={current.antifonas.entrada} />
-              <Prayer title="Oração do dia" text={current.oracoes.coleta} />
-              {current.leituras.map((reading) => (
-                <Reading key={reading.ordem} reading={reading} />
-              ))}
-              <Prayer title="Oração sobre as oferendas" text={current.oracoes.oferendas} />
-              <Prayer title="Antífona da comunhão" text={current.antifonas.comunhao} />
-              <Prayer title="Oração depois da comunhão" text={current.oracoes.comunhao} />
-              {current.oracoes.extras.map((extra, index) => (
-                <Prayer key={index} title={extra.titulo ?? 'Oração'} text={extra.texto} />
-              ))}
-            </div>
-          </details>
+          {/* A chave recolhe o texto ao trocar de dia ou de celebração. */}
+          <FullText key={`${date}-${current.id}`}>
+            <Prayer title="Antífona de entrada" text={current.antifonas.entrada} />
+            <Prayer title="Oração do dia" text={current.oracoes.coleta} />
+            {current.leituras.map((reading) => (
+              <Reading key={reading.ordem} reading={reading} />
+            ))}
+            <Prayer title="Oração sobre as oferendas" text={current.oracoes.oferendas} />
+            <Prayer title="Antífona da comunhão" text={current.antifonas.comunhao} />
+            <Prayer title="Oração depois da comunhão" text={current.oracoes.comunhao} />
+            {current.oracoes.extras.map((extra, index) => (
+              <Prayer key={index} title={extra.titulo ?? 'Oração'} text={extra.texto} />
+            ))}
+          </FullText>
         </>
       )}
     </section>

@@ -4,6 +4,7 @@ import {
   extractPlainLyrics,
   extractKey,
   groupIntoWords,
+  floatingChords,
 } from '@/domain/chordpro/parse.js';
 
 describe('parseChordPro', () => {
@@ -162,5 +163,52 @@ describe('groupIntoWords', () => {
 
   it('devolve lista vazia para linha sem conteúdo', () => {
     expect(groupIntoWords([])).toEqual([]);
+  });
+});
+
+describe('cifras importadas', () => {
+  it('ignora espaços de largura zero no início da linha', () => {
+    const doc = parseChordPro('\u200B[E]Maria');
+    expect(doc.lines[0].pairs[0]).toEqual({ chord: 'E', lyrics: 'Maria' });
+  });
+
+  it('[Primeira Parte] sozinho na linha é título de seção', () => {
+    expect(parseChordPro('\u200B[Primeira Parte]').lines[0]).toEqual({ type: 'comment', text: 'Primeira Parte' });
+  });
+
+  it('acorde sozinho na linha continua sendo acorde', () => {
+    expect(parseChordPro('[Am]').lines[0].type).toBe('lyric');
+  });
+});
+
+describe('floatingChords', () => {
+  const flutuam = (linha, render) => {
+    const words = groupIntoWords(parseChordPro(linha).lines[0].pairs);
+    const chaves = floatingChords(words, render);
+    return words.flatMap((word, w) =>
+      word.segments.flatMap((segment, s) => (segment.chord ? [[segment.chord, chaves.has(`${w}:${s}`)]] : [])),
+    );
+  };
+
+  it('acorde sobre espaço ou sílaba curta não alarga a letra', () => {
+    expect(flutuam('foi a[B] escolhida')).toEqual([['B', true]]);
+    expect(flutuam('com te[F#]u povo')).toEqual([['F#', true]]);
+  });
+
+  it('reserva espaço quando encostaria no acorde seguinte', () => {
+    expect(flutuam('[C#m7]a[F#]mor')).toEqual([['C#m7', false], ['F#', true]]);
+  });
+
+  it('com sílabas longas, os dois flutuam', () => {
+    expect(flutuam('[G]Santo Senhor [D]Deus')).toEqual([['G', true], ['D', true]]);
+  });
+
+  it('acorde sem letra embaixo mantém a própria largura', () => {
+    expect(flutuam('[E] [A] [C#m]')).toEqual([['E', false], ['A', false], ['C#m', false]]);
+  });
+
+  it('conta o acorde como aparece na tela, depois de transpor', () => {
+    expect(flutuam('[E7]se[F]nhor')).toEqual([['E7', false], ['F', true]]);
+    expect(flutuam('[E]sen[F]hor', () => 'Ebm7')).toEqual([['E', false], ['F', true]]);
   });
 });

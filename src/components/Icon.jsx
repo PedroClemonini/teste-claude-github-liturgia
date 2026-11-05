@@ -26,6 +26,14 @@ const ICONS = {
   'check-mark': `<path fill="currentcolor" d="m13.959 3.97-7.25 9a.75.75 0 0 1-1.163.007l-3.5-4.25 1.158-.954 2.914 3.539 6.673-8.283z"/>`,
   'sidebar-collapse': `<path fill="currentcolor" fill-rule="evenodd" d="M2 2.5a.5.5 0 0 0-.5.5v10a.5.5 0 0 0 .5.5h2v-11zm3.5 0v11H14a.5.5 0 0 0 .5-.5V3a.5.5 0 0 0-.5-.5zM0 3a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm7.97 4.47 2.5-2.5 1.06 1.06L9.56 8l1.97 1.97-1.06 1.06-2.5-2.5a.75.75 0 0 1 0-1.06" clip-rule="evenodd"/>`,
   'sidebar-expand': `<path fill="currentcolor" fill-rule="evenodd" d="M14 2.5a.5.5 0 0 1 .5.5v10a.5.5 0 0 1-.5.5h-2v-11zm-3.5 0v11H2a.5.5 0 0 1-.5-.5V3a.5.5 0 0 1 .5-.5zM16 3a2 2 0 0 0-2-2H2a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2zM8.03 7.47l-2.5-2.5-1.06 1.06L6.44 8 4.47 9.97l1.06 1.06 2.5-2.5a.75.75 0 0 0 0-1.06" clip-rule="evenodd"/>`,
+  'filter': `<path fill="currentcolor" d="M11 12v1.5H5V12zm2-4.75v1.5H3v-1.5zm2-4.75V4H1V2.5z"/>`,
+  'show-more-vertical': `<path fill="currentcolor" fill-rule="evenodd" d="M6.5 1.5a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0m0 6.5a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0m0 6.5a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0" clip-rule="evenodd"/>`,
+  'person-add': `<path fill="currentcolor" d="M1 12.75A3.75 3.75 0 0 1 4.75 9H9v1.5H4.75a2.25 2.25 0 0 0-2.25 2.25V15H1zM9.5 4a2.5 2.5 0 1 0-5 0 2.5 2.5 0 0 0 5 0M11 4a4 4 0 1 1-8 0 4 4 0 0 1 8 0m2.75 6v2.25H16v1.5h-2.25V16h-1.5v-2.25H10v-1.5h2.25V10z"/>`,
+  'link': `<path fill="currentcolor" fill-rule="evenodd" d="M8.22 2.22a3.932 3.932 0 1 1 5.56 5.56l-2.25 2.25-1.06-1.06 2.25-2.25a2.432 2.432 0 0 0-3.44-3.44L7.03 5.53 5.97 4.47zm3.06 3.56-5.5 5.5-1.06-1.06 5.5-5.5zM2.22 8.22l2.25-2.25 1.06 1.06-2.25 2.25a2.432 2.432 0 0 0 3.44 3.44l2.25-2.25 1.06 1.06-2.25 2.25a3.932 3.932 0 1 1-5.56-5.56" clip-rule="evenodd"/>`,
+  'person-remove': `<path fill="currentcolor" d="M1 12.75A3.75 3.75 0 0 1 4.75 9H9v1.5H4.75a2.25 2.25 0 0 0-2.25 2.25V15H1zM9.5 4a2.5 2.5 0 1 0-5 0 2.5 2.5 0 0 0 5 0M11 4a4 4 0 1 1-8 0 4 4 0 0 1 8 0m4.78 7.28L14.06 13l1.72 1.72-1.06 1.06L13 14.06l-1.72 1.72-1.06-1.06L11.94 13l-1.72-1.72 1.06-1.06L13 11.94l1.72-1.72z"/>`,
+  'arrow-left': `<path fill="currentcolor" fill-rule="evenodd" d="m1.22 7.47 5-5 1.06 1.06-3.72 3.72H15v1.5H3.56l3.72 3.72-1.06 1.06-5-5a.75.75 0 0 1 0-1.06" clip-rule="evenodd"/>`,
+  'retry': `<path fill="currentcolor" fill-rule="evenodd" d="M1 8a7 7 0 0 1 12.5-4.33V1H15v5a.75.75 0 0 1-.75.75H9.5v-1.5h3.264a5.5 5.5 0 1 0 .665 3.63l1.482.24A7.002 7.002 0 0 1 1 8" clip-rule="evenodd"/>`,
+  'text': `<path fill="currentcolor" d="M11 1v1.5H6.25V15h-1.5V2.5H0V1zm1 12V8h-2V6.5h2V4h1.5v2.5H16V8h-2.5v5a.5.5 0 0 0 .5.5h2V15h-2a2 2 0 0 1-2-2"/>`,
 };
 
 /** @param {{name: keyof typeof ICONS, size?: number}} props */

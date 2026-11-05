@@ -1,16 +1,20 @@
 'use client';
 
 /**
- * Barra da Equipe e da aba Capelas: um único seletor de capela e as ações sobre
- * a capela escolhida (convites e, para o dono, novo usuário e nova capela).
+ * Barra da Equipe e da aba Capelas: um seletor de capela, que também cria capelas
+ * para o dono, e um único botão para acrescentar pessoas à capela escolhida.
  * Não existe envio de e-mail — o link é copiado e compartilhado manualmente.
  */
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ActionMenu } from './ActionMenu.jsx';
 import { Icon } from './Icon.jsx';
 import { Modal } from './Modal.jsx';
 import { NewMemberModal } from './NewMemberModal.jsx';
 import { Select } from './Select.jsx';
+
+/** Opção do seletor que abre a criação de capela, em vez de escolher uma. */
+const NEW_CAPELA = 'nova-capela';
 
 function formatarData(iso) {
   return new Date(iso).toLocaleDateString('pt-BR', {
@@ -105,43 +109,53 @@ export function CapelaToolbar({ options, selected, basePath, canManage = false, 
     }
   };
 
+  const personItems = [
+    canCreate && { label: 'Criar usuário', icon: 'person-add', onSelect: () => setNewMemberOpen(true) },
+    { label: 'Gerar link de convite', icon: 'link', onSelect: gerarConvite },
+    pendentes.length > 0 && {
+      label: `Convites pendentes (${pendentes.length})`,
+      icon: 'people-group',
+      onSelect: () => setInvitesOpen(true),
+    },
+  ].filter(Boolean);
+
+  const selectOptions = canCreate
+    ? [...options, { value: NEW_CAPELA, label: '+ Adicionar capela', action: true }]
+    : options;
+
+  const trocarCapela = (value) => {
+    if (value === NEW_CAPELA) setNewCapelaOpen(true);
+    else router.push(`${basePath}?capela=${encodeURIComponent(value)}`);
+  };
+
   return (
     <div className="ui-toolbar">
       {options.length > 0 && (
         <div className="ui-toolbar__select">
-          <Select
-            label="Capela"
-            value={selected ?? ''}
-            options={options}
-            onChange={(value) => router.push(`${basePath}?capela=${encodeURIComponent(value)}`)}
-          />
+          <Select compact label="Capela" value={selected ?? ''} options={selectOptions} onChange={trocarCapela} />
         </div>
       )}
 
-      <div className="ui-button-group ui-toolbar__actions">
-        {canManage && pendentes.length > 0 && (
-          <button type="button" className="ui-button ui-button--subtle" onClick={() => setInvitesOpen(true)}>
-            Convites pendentes ({pendentes.length})
-          </button>
-        )}
-        {canManage && (
-          <button type="button" className="ui-button" onClick={gerarConvite}>
-            Gerar link de convite
-          </button>
-        )}
-        {canManage && canCreate && (
-          <button type="button" className="ui-button" onClick={() => setNewMemberOpen(true)}>
-            <Icon name="add" />
-            Novo usuário
-          </button>
-        )}
-        {canCreate && (
-          <button type="button" className="ui-button ui-button--primary" onClick={() => setNewCapelaOpen(true)}>
-            <Icon name="add" />
-            Nova capela
-          </button>
-        )}
-      </div>
+      {options.length === 0 && canCreate && (
+        <button type="button" className="ui-button ui-button--primary" onClick={() => setNewCapelaOpen(true)}>
+          <Icon name="add" />
+          Nova capela
+        </button>
+      )}
+
+      {canManage && personItems.length === 1 && (
+        <button type="button" className="ui-button ui-button--primary" onClick={personItems[0].onSelect}>
+          <Icon name="add" />
+          Adicionar pessoa
+        </button>
+      )}
+
+      {canManage && personItems.length > 1 && (
+        <ActionMenu label="Adicionar pessoa" items={personItems} triggerClassName="ui-button ui-button--primary">
+          <Icon name="add" />
+          Adicionar pessoa
+        </ActionMenu>
+      )}
 
       {error && (
         <p className="ui-error ui-toolbar__error" role="alert">

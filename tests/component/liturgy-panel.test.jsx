@@ -26,7 +26,15 @@ const celebracao = (extra) => ({
 
 const painel = (props) =>
   render(
-    <LiturgyPanel date="2026-11-08" isToday previousHref="/a" nextHref="/b" todayHref="/agenda" {...props} />,
+    <LiturgyPanel
+      date="2026-11-08"
+      isToday
+      dayColor="Verde"
+      previousHref="/a"
+      nextHref="/b"
+      todayHref="/agenda"
+      {...props}
+    />,
   );
 
 describe('LiturgyPanel', () => {
@@ -34,14 +42,47 @@ describe('LiturgyPanel', () => {
     painel({ liturgy: { celebracoes: [celebracao()] } });
     expect(screen.getByRole('heading', { name: 'Terça-feira do Tempo Comum' })).toBeTruthy();
     expect(screen.getByText('Verde')).toBeTruthy();
-    expect(screen.getByRole('list').textContent).toContain('Lc 1,1');
-    expect(screen.getByText('Ler a liturgia completa').closest('details').open).toBe(false);
+    expect(screen.getByRole('term').textContent).toBe('Evangelho');
+    expect(screen.getByRole('definition').textContent).toBe('Lc 1,1');
+    expect(screen.getByRole('button', { name: 'Ler a liturgia completa' }).getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('o texto completo já vem na página, e o botão do celular o mostra e recolhe', async () => {
+    const user = userEvent.setup();
+    const { container } = painel({ liturgy: { celebracoes: [celebracao()] } });
+    const texto = container.querySelector('.ui-liturgy__text');
+    expect(texto.textContent).toContain('Naquele tempo');
+    expect(texto.dataset.open).toBeUndefined();
+
+    await user.click(screen.getByRole('button', { name: 'Ler a liturgia completa' }));
+    expect(texto.dataset.open).toBeDefined();
+
+    await user.click(screen.getByRole('button', { name: 'Recolher a liturgia' }));
+    expect(texto.dataset.open).toBeUndefined();
   });
 
   it('sem liturgia, avisa e mantém a navegação entre os dias', () => {
     painel({ liturgy: null });
     expect(screen.getByText(/não está disponível/)).toBeTruthy();
     expect(screen.getByRole('link', { name: /dia seguinte/ })).toBeTruthy();
+  });
+
+  it('o título acompanha o dia escolhido', () => {
+    painel({ liturgy: null, isToday: false, date: '2026-11-06' });
+    expect(screen.getByText('Liturgia de sexta-feira, 6 de novembro de 2026')).toBeTruthy();
+    cleanup();
+    painel({ liturgy: null });
+    expect(screen.getByText('Liturgia de hoje')).toBeTruthy();
+  });
+
+  it('mostra um único dia, com a cor litúrgica e as setas', () => {
+    const { container } = painel({ liturgy: null, date: '2026-11-04' });
+    const dia = screen.getByText('quarta-feira 4');
+    expect(dia.getAttribute('aria-current')).toBe('date');
+    expect(dia.querySelector('.cor-dot').dataset.cor).toBe('Verde');
+    expect(container.querySelectorAll('.ui-day-nav a')).toHaveLength(2);
+    expect(screen.getByRole('link', { name: /dia anterior/ }).getAttribute('href')).toBe('/a');
+    expect(screen.getByRole('link', { name: /dia seguinte/ }).getAttribute('href')).toBe('/b');
   });
 
   it('com memória facultativa, troca de celebração nas abas, começando pela principal', async () => {
@@ -73,11 +114,11 @@ describe('LiturgyPanel', () => {
     expect(screen.getByText(/Liturgia desta missa/)).toBeTruthy();
   });
 
-  it('botão Hoje só aparece em outro dia', () => {
+  it('Voltar para hoje só aparece em outro dia', () => {
     painel({ liturgy: null });
-    expect(screen.queryByRole('link', { name: 'Hoje' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Voltar para hoje' })).toBeNull();
     cleanup();
     painel({ liturgy: null, isToday: false });
-    expect(screen.getByRole('link', { name: 'Hoje' }).getAttribute('href')).toBe('/agenda');
+    expect(screen.getByRole('link', { name: 'Voltar para hoje' }).getAttribute('href')).toBe('/agenda');
   });
 });
