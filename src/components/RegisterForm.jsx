@@ -3,21 +3,9 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
+import { InstrumentPicker } from './InstrumentPicker.jsx';
 
-const VAZIO = { name: '', email: '', password: '', voiceOrInstrument: '' };
-
-/** Sugestões comuns; o campo aceita qualquer texto. */
-const SUGESTOES = [
-  'Soprano',
-  'Contralto',
-  'Tenor',
-  'Baixo',
-  'Violão',
-  'Teclado',
-  'Flauta',
-  'Violino',
-  'Percussão',
-];
+const VAZIO = { name: '', email: '', password: '', instruments: [] };
 
 /** @param {{inviteToken: string}} props */
 export function RegisterForm({ inviteToken }) {
@@ -57,59 +45,73 @@ export function RegisterForm({ inviteToken }) {
   };
 
   return (
-    <form onSubmit={submit} noValidate>
-      <label className="field">
+    <form className="ui-form ui-stack ui-auth__form" onSubmit={submit} noValidate>
+      <label className="ui-field">
         <span>Nome</span>
-        <input name="name" autoComplete="name" required value={form.name} onChange={update('name')} />
-        {errors.name && <p className="error">{errors.name}</p>}
+        <input
+          name="name"
+          autoComplete="name"
+          required
+          value={form.name}
+          onChange={update('name')}
+          aria-invalid={Boolean(errors.name)}
+        />
+        {errors.name && <p className="ui-error">{errors.name}</p>}
       </label>
 
-      <label className="field">
+      <label className="ui-field">
         <span>E-mail</span>
-        <input type="email" name="email" autoComplete="email" required value={form.email} onChange={update('email')} />
-        {errors.email && <p className="error">{errors.email}</p>}
-      </label>
-
-      <label className="field">
-        <span>Senha (mínimo 8 caracteres)</span>
         <input
-          type="password"
-          name="password"
-          autoComplete="new-password"
+          type="email"
+          name="email"
+          autoComplete="email"
           required
-          value={form.password}
-          onChange={update('password')}
+          value={form.email}
+          onChange={update('email')}
+          aria-invalid={Boolean(errors.email)}
         />
-        {errors.password && <p className="error">{errors.password}</p>}
+        {errors.email && <p className="ui-error">{errors.email}</p>}
       </label>
 
-      <label className="field">
-        <span>Voz ou instrumento</span>
-        <input
-          name="voiceOrInstrument"
-          list="sugestoes-voz"
-          required
-          placeholder="Soprano, Violão…"
-          value={form.voiceOrInstrument}
-          onChange={update('voiceOrInstrument')}
-        />
-        <datalist id="sugestoes-voz">
-          {SUGESTOES.map((item) => (
-            <option key={item} value={item} />
-          ))}
-        </datalist>
-        {errors.voiceOrInstrument && <p className="error">{errors.voiceOrInstrument}</p>}
-      </label>
+      <div>
+        <label className="ui-field">
+          <span>Senha</span>
+          <input
+            type="password"
+            name="password"
+            autoComplete="new-password"
+            required
+            value={form.password}
+            onChange={update('password')}
+            aria-invalid={Boolean(errors.password)}
+            aria-describedby="senha-ajuda"
+          />
+        </label>
+        <p className="ui-helper" id="senha-ajuda">
+          Mínimo de 8 caracteres. Se já tem conta em outra capela, use o mesmo e-mail e a mesma senha.
+        </p>
+        {errors.password && <p className="ui-error">{errors.password}</p>}
+      </div>
 
-      {errors.inviteToken && <p className="error">{errors.inviteToken}</p>}
-      {message && <p className="error">{message}</p>}
+      <InstrumentPicker
+        value={form.instruments}
+        onChange={(instruments) => setForm({ ...form, instruments })}
+        error={errors.instruments}
+      />
 
-      <button className="btn" type="submit" disabled={busy}>
+      {errors.inviteToken && <p className="ui-error">{errors.inviteToken}</p>}
+      {message && (
+        <p className="ui-error" role="alert">
+          {message}
+        </p>
+      )}
+
+      <button className="ui-button ui-button--primary" type="submit" disabled={busy}>
         {busy ? 'Cadastrando…' : 'Criar conta'}
       </button>
-      <p style={{ fontSize: '0.8rem', color: 'var(--text-soft)', marginTop: '0.6rem' }}>
-        Você vai entrar como Músico na capela que te convidou. Um coordenador
-        pode promover integrantes na tela Equipe.
+      <p className="ui-helper">
+        Você vai entrar como Músico na capela que te convidou. Um coordenador pode promover
+        integrantes na tela Equipe.
       </p>
     </form>
   );

@@ -1,10 +1,10 @@
 /**
  * Login seguro com NextAuth (Auth.js).
  *
- * A sessão é um JWT assinado que carrega o papel do usuário, de modo que
- * páginas e rotas saibam o que ele pode fazer sem uma consulta extra ao banco.
- * A senha nunca sai do servidor: é comparada com o hash pelo serviço de
- * usuários.
+ * A sessão é um JWT assinado que só identifica o usuário: papéis e capelas são
+ * lidos do banco a cada requisição (veja session.js), para que uma mudança de
+ * vínculo valha na hora. A senha nunca sai do servidor: é comparada com o hash
+ * pelo serviço de usuários.
  */
 import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
@@ -28,31 +28,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           password: credentials?.password,
         });
         if (!user) return null;
-        return {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          voiceOrInstrument: user.voiceOrInstrument,
-          capelaId: user.capelaId,
-        };
+        return { id: user.id, name: user.name, email: user.email };
       },
     }),
   ],
   callbacks: {
-    jwt({ token, user }) {
-      if (user) {
-        token.role = user.role;
-        token.voiceOrInstrument = user.voiceOrInstrument;
-        token.capelaId = user.capelaId;
-      }
-      return token;
-    },
     session({ session, token }) {
       session.user.id = token.sub;
-      session.user.role = token.role;
-      session.user.voiceOrInstrument = token.voiceOrInstrument;
-      session.user.capelaId = token.capelaId;
       return session;
     },
   },

@@ -8,6 +8,7 @@ import {
   getCelebration,
   nextCelebrations,
   listCelebrationCapelas,
+  setLiturgyChoice,
 } from '@/services/celebrations.js';
 import { createSong } from '@/services/songs.js';
 import { setRepertoire } from '@/services/repertoire.js';
@@ -365,5 +366,45 @@ describe('participantes', () => {
     );
     const found = await getCelebration(updated.id, coordenador);
     expect(found.participants.map((p) => p.id)).toEqual([outro.id]);
+  });
+});
+
+describe('setLiturgyChoice', () => {
+  const sabado = { title: 'Missa', date: '2026-11-07T19:00:00.000Z', type: 'MISSA_COMUM' };
+
+  it('quem administra a capela troca a liturgia da missa de sábado', async () => {
+    const evento = await createCelebration({ ...sabado, capelaId: capela.id }, coordenador);
+    const atualizado = await setLiturgyChoice(evento.id, 'SABADO', coordenador);
+    expect(atualizado.liturgyChoice).toBe('SABADO');
+  });
+
+  it('recusa evento que não é missa de sábado', async () => {
+    const domingo = await createCelebration(
+      { ...sabado, date: '2026-11-08T10:00:00.000Z', capelaId: capela.id },
+      coordenador,
+    );
+    const ensaio = await createCelebration({ ...sabado, type: 'ENSAIO', capelaId: capela.id }, coordenador);
+
+    await expect(setLiturgyChoice(domingo.id, 'DOMINGO', coordenador)).rejects.toMatchObject({ status: 422 });
+    await expect(setLiturgyChoice(ensaio.id, 'DOMINGO', coordenador)).rejects.toMatchObject({ status: 422 });
+  });
+
+  it('recusa opção desconhecida', async () => {
+    const evento = await createCelebration({ ...sabado, capelaId: capela.id }, coordenador);
+    await expect(setLiturgyChoice(evento.id, 'TERCA', coordenador)).rejects.toMatchObject({ status: 422 });
+  });
+
+  it('músico e coordenador de outra capela não trocam', async () => {
+    const evento = await createCelebration({ ...sabado, capelaId: capela.id }, coordenador);
+    const musico = await makeMusician({ capelaId: capela.id });
+    const outra = await makeCapela({ name: 'Outra' });
+    const deFora = await makeCoordinator({ capelaId: outra.id });
+
+    await expect(setLiturgyChoice(evento.id, 'SABADO', musico)).rejects.toMatchObject({ status: 403 });
+    await expect(setLiturgyChoice(evento.id, 'SABADO', deFora)).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('avisa quando o evento não existe', async () => {
+    await expect(setLiturgyChoice('inexistente', 'SABADO', coordenador)).rejects.toMatchObject({ status: 404 });
   });
 });

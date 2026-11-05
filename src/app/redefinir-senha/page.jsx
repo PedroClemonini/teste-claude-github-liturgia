@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { currentUser } from '@/lib/session.js';
-import { isAdministrator } from '@/domain/auth/roles.js';
 import { checkResetToken } from '@/services/passwordReset.js';
 import { ResetPasswordForm } from '@/components/ResetPasswordForm.jsx';
 
@@ -9,7 +8,7 @@ export const metadata = { title: 'Nova senha · Coral Litúrgico' };
 
 export default async function ResetPasswordPage({ searchParams }) {
   const user = await currentUser();
-  if (user) redirect(isAdministrator(user) ? '/admin' : '/agenda');
+  if (user) redirect('/agenda');
 
   const query = await searchParams;
   const token = typeof query?.token === 'string' ? query.token : '';
@@ -18,20 +17,20 @@ export default async function ResetPasswordPage({ searchParams }) {
   const { valid, reason } = await checkResetToken(token);
 
   return (
-    <div className="auth">
-      <div className="card">
-        <h1>Escolher nova senha</h1>
-        {valid ? (
-          <ResetPasswordForm token={token} />
-        ) : (
-          <>
-            <p className="error">{reason}</p>
-            <p style={{ fontSize: '0.9rem', marginTop: '1rem' }}>
-              <Link href="/esqueci-senha">Pedir um novo link</Link>
-            </p>
-          </>
-        )}
-      </div>
+    <div className="ui-auth">
+      <h1 className="ui-heading-large">Escolher nova senha</h1>
+      {valid ? (
+        <ResetPasswordForm token={token} />
+      ) : (
+        <>
+          <p className="ui-section-message ui-section-message--danger" role="alert">
+            {reason}
+          </p>
+          <p className="ui-auth__link">
+            <Link href="/esqueci-senha">Pedir um novo link</Link>
+          </p>
+        </>
+      )}
     </div>
   );
 }

@@ -10,13 +10,18 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// Papéis de usuário: o Administrador funda capelas e concede coordenações,
-/// o Coordenador organiza calendário e acervo da própria capela, o Músico
-/// consulta escalas e cifras.
+/// Papel de uma pessoa dentro de uma capela: o Coordenador organiza calendário
+/// e equipe daquela capela, o Músico consulta escalas e cifras. O mesmo usuário
+/// pode ter papéis diferentes em capelas diferentes (veja CapelaMembership).
 enum Role {
-  ADMINISTRADOR
   COORDENADOR
   MUSICO
+}
+
+/// Qual liturgia uma missa de sábado segue. Vazio decide pelo horário.
+enum LiturgyChoice {
+  SABADO
+  DOMINGO
 }
 
 /// Natureza da evento no painel de agenda.
@@ -39,6 +44,7 @@ enum LiturgicalSeason {
 /// Momentos do rito aos quais uma música pode ser associada.
 enum LiturgicalMoment {
   ENTRADA
+  HINOS
   ATO_PENITENCIAL
   GLORIA
   SALMO
@@ -47,8 +53,6 @@ enum LiturgicalMoment {
   OFERTORIO
   SANTO
   ORACAO_EUCARISTICA
-  MISTERIO_DA_FE
-  GRANDE_AMEM
   CORDEIRO
   COMUNHAO
   ACAO_DE_GRACAS
@@ -60,12 +64,12 @@ model User {
   name              String
   email             String   @unique
   passwordHash      String
-  /// Voz ou instrumento (ex.: "Soprano", "Violão").
-  voiceOrInstrument String
-  role              Role     @default(MUSICO)
-  /// Capela-casa do integrante; nula só em contas legadas/órfãs.
-  capelaId          String?
-  capela            Capela?  @relation("UserHomeCapela", fields: [capelaId], references: [id], onDelete: SetNull)
+  /// Vozes e instrumentos da pessoa (ex.: "Soprano", "Violão").
+  instruments       String[]
+  /// Dono do sistema: coordena todas as capelas, cria capelas e adiciona
+  /// pessoas em qualquer uma. Vale true ou NULL, nunca false: como o índice
+  /// único ignora NULL, o próprio banco garante um único dono.
+  isOwner           Boolean? @unique
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -77,12 +81,32 @@ model User {
   /// Celebrações em que canta ou toca, mesmo as de outra capela (participação mista).
   participatingIn    Celebration[] @relation("CelebrationParticipants")
   passwordResets     PasswordResetToken[]
+  memberships        CapelaMembership[]
+}
 
-  @@index([role])
+/// Liturgia de um dia, copiada da API pública para o site não depender dela.
+/// `payload` nulo marca um dia que a API não tinha: é consultado de novo depois.
+model LiturgyDay {
+  date      DateTime @id @db.Date
+  payload   Json?
+  fetchedAt DateTime @default(now())
+}
+
+/// Vínculo entre uma pessoa e uma capela, com o papel dela ali.
+model CapelaMembership {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  capelaId  String
+  capela    Capela   @relation(fields: [capelaId], references: [id], onDelete: Cascade)
+  role      Role     @default(MUSICO)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, capelaId])
   @@index([capelaId])
 }
 
-/// Uma capela/paróquia: agrupa membros e celebrações sob um mesmo coordenador.
+/// Uma capela/paróquia: agrupa membros e celebrações.
 model Capela {
   id          String   @id @default(cuid())
   name        String
@@ -91,7 +115,7 @@ model Capela {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  members      User[]        @relation("UserHomeCapela")
+  memberships  CapelaMembership[]
   celebrations Celebration[] @relation("CelebrationCapela")
   invites      Invite[]
 
@@ -143,6 +167,8 @@ model Celebration {
   notes       String?
   capelaId    String
   capela      Capela           @relation("CelebrationCapela", fields: [capelaId], references: [id], onDelete: Cascade)
+  /// Só faz sentido em missa de sábado; vazio segue a regra das 17h.
+  liturgyChoice LiturgyChoice?
   createdById String?
   createdBy   User?            @relation("CelebrationCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   createdAt   DateTime         @default(now())
@@ -171,6 +197,8 @@ model Song {
   moments     LiturgicalMoment[]
   /// Tempos litúrgicos adequados; vazio significa "qualquer tempo".
   seasons     LiturgicalSeason[]
+  /// Tags livres para achar a música (ex.: novenasaofrancisco), sem o #.
+  tags        String[]         @default([])
   /// Texto da letra sem acordes, mantido para busca por trecho.
   plainLyrics String
   createdById String?

@@ -1,15 +1,17 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { LITURGICAL_SEASONS, seasonForDate } from '@/domain/liturgy/seasons.js';
+import { LITURGICAL_SEASONS, seasonForDate, seasonLabel } from '@/domain/liturgy/seasons.js';
 import { celebrationTypeLabel } from '@/domain/calendar/grid.js';
+import { Select } from './Select.jsx';
 
 const TIPOS = ['MISSA_COMUM', 'MISSA_SOLENE', 'ENSAIO'];
 
 /**
  * Cadastro e edição de evento. O tempo litúrgico já vem sugerido pela
- * data escolhida — o coordenador só mexe quando a evento pede outro.
+ * data escolhida — o coordenador só mexe quando o evento pede outro.
  *
  * @param {{celebration?: object, capelas?: {id: string, name: string}[], participantOptions?: {id: string, name: string, capelaName: string|null, ownCapela: boolean}[]}} props
  */
@@ -84,119 +86,136 @@ export function CelebrationForm({ celebration = null, capelas = [], participantO
   };
 
   return (
-    <form onSubmit={submit} className="card" noValidate>
-      {(editando || capelas.length > 0) && (
-        <label className="field" style={{ maxWidth: !editando && capelas.length > 1 ? 'none' : '16rem' }}>
-          <span>Capela{editando ? ' (não muda depois de criada)' : ''}</span>
+    <form onSubmit={submit} className="ui-form" noValidate>
+      <section className="ui-form__section">
+        <h2 className="ui-heading-small">Dados do evento</h2>
+        <div className="ui-stack">
           {!editando && capelas.length > 1 ? (
-            <select value={form.capelaId} onChange={update('capelaId')}>
-              {capelas.map((capela) => (
-                <option key={capela.id} value={capela.id}>
-                  {capela.name}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <input
-              value={
-                editando
-                  ? (celebration.capela?.name ?? '')
-                  : (capelas.find((capela) => capela.id === form.capelaId)?.name ?? capelas[0]?.name ?? '')
-              }
-              disabled
+            <Select
+              label="Capela"
+              value={form.capelaId}
+              options={capelas.map((capela) => ({ value: capela.id, label: capela.name }))}
+              onChange={(capelaId) => setForm({ ...form, capelaId })}
             />
+          ) : (
+            (editando || capelas.length > 0) && (
+              <label className="ui-field">
+                <span>Capela{editando ? ' (não muda depois de criada)' : ''}</span>
+                <input
+                  value={
+                    editando
+                      ? (celebration.capela?.name ?? '')
+                      : (capelas.find((capela) => capela.id === form.capelaId)?.name ?? capelas[0]?.name ?? '')
+                  }
+                  disabled
+                />
+              </label>
+            )
           )}
-        </label>
-      )}
 
-      <label className="field">
-        <span>Título</span>
-        <input
-          required
-          value={form.title}
-          onChange={update('title')}
-          placeholder="Missa dominical, Casamento Ana e Pedro, Ensaio geral…"
-        />
-        {errors.title && <p className="error">{errors.title}</p>}
-      </label>
+          <label className="ui-field">
+            <span>
+              Título <em aria-hidden="true">*</em>
+            </span>
+            <input
+              required
+              value={form.title}
+              onChange={update('title')}
+              aria-invalid={Boolean(errors.title)}
+              placeholder="Missa dominical, Casamento Ana e Pedro, Ensaio geral…"
+            />
+            {errors.title && <p className="ui-error">{errors.title}</p>}
+          </label>
 
-      <div className="grid-2">
-        <label className="field">
-          <span>Data e horário</span>
-          <input type="datetime-local" required value={form.date} onChange={update('date')} />
-          {errors.date && <p className="error">{errors.date}</p>}
-        </label>
+          <div className="grid-2">
+            <label className="ui-field">
+              <span>
+                Data e horário <em aria-hidden="true">*</em>
+              </span>
+              <input
+                type="datetime-local"
+                required
+                value={form.date}
+                onChange={update('date')}
+                aria-invalid={Boolean(errors.date)}
+              />
+              {errors.date && <p className="ui-error">{errors.date}</p>}
+            </label>
 
-        <label className="field">
-          <span>Tipo</span>
-          <select value={form.type} onChange={update('type')}>
-            {TIPOS.map((tipo) => (
-              <option key={tipo} value={tipo}>
-                {celebrationTypeLabel(tipo)}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+            <Select
+              label="Tipo"
+              value={form.type}
+              options={TIPOS.map((tipo) => ({ value: tipo, label: celebrationTypeLabel(tipo) }))}
+              onChange={(type) => setForm({ ...form, type })}
+            />
 
-      <div className="grid-2">
-        <label className="field">
-          <span>Tempo litúrgico</span>
-          <select value={form.season} onChange={update('season')}>
-            <option value="">
-              {sugestao ? `Automático pela data (${sugestao})` : 'Automático pela data'}
-            </option>
-            {LITURGICAL_SEASONS.map((season) => (
-              <option key={season.id} value={season.id}>
-                {season.label}
-              </option>
-            ))}
-          </select>
-        </label>
+            <Select
+              label="Tempo litúrgico"
+              value={form.season}
+              options={[
+                {
+                  value: '',
+                  label: sugestao ? `Automático pela data (${seasonLabel(sugestao)})` : 'Automático pela data',
+                },
+                ...LITURGICAL_SEASONS.map((season) => ({ value: season.id, label: season.label })),
+              ]}
+              onChange={(season) => setForm({ ...form, season })}
+            />
 
-        <label className="field">
-          <span>Local (opcional)</span>
-          <input value={form.location} onChange={update('location')} placeholder="Igreja Matriz" />
-        </label>
-      </div>
+            <label className="ui-field">
+              <span>Local</span>
+              <input value={form.location} onChange={update('location')} placeholder="Igreja Matriz" />
+            </label>
+          </div>
 
-      <label className="field">
-        <span>Observações (opcional)</span>
-        <textarea
-          rows={3}
-          value={form.notes}
-          onChange={update('notes')}
-          placeholder="Quem acompanha, ensaio prévio, pedidos da família…"
-        />
-      </label>
+          <label className="ui-field">
+            <span>Observações</span>
+            <textarea
+              rows={3}
+              value={form.notes}
+              onChange={update('notes')}
+              placeholder="Quem acompanha, ensaio prévio, pedidos da família…"
+            />
+          </label>
+        </div>
+      </section>
 
       {participantOptions.length > 0 && (
-        <fieldset style={{ border: 0, padding: 0, margin: '0 0 0.8rem' }}>
-          <legend style={{ fontSize: '0.85rem', fontWeight: 600, padding: 0 }}>
-            Participantes (opcional — sua capela aparece primeiro)
-          </legend>
-          <div className="row">
+        <section className="ui-form__section">
+          <h2 className="ui-heading-small">Participantes</h2>
+          <p className="ui-helper">Opcional. Quem é das suas capelas aparece primeiro.</p>
+          <div className="ui-checkbox-grid ui-checkbox-grid--wide">
             {participantOptions.map((participant) => (
-              <label key={participant.id} className="tag tag--choice" style={{ cursor: 'pointer' }}>
+              <label key={participant.id} className="ui-checkbox">
                 <input
                   type="checkbox"
-                  style={{ width: '1.1rem', height: '1.1rem', minHeight: 0, marginRight: '0.4rem' }}
                   checked={form.participantIds.includes(participant.id)}
                   onChange={() => toggleParticipant(participant.id)}
                 />
-                {participant.name}
-                {!participant.ownCapela && participant.capelaName ? ` (${participant.capelaName})` : ''}
+                <span>
+                  {participant.name}
+                  {!participant.ownCapela && participant.capelaName && <small>{participant.capelaName}</small>}
+                </span>
               </label>
             ))}
           </div>
-        </fieldset>
+        </section>
       )}
 
-      {message && <p className="error">{message}</p>}
+      {message && (
+        <p className="ui-error" role="alert">
+          {message}
+        </p>
+      )}
 
-      <button className="btn" type="submit" disabled={busy}>
-        {busy ? 'Salvando…' : editando ? 'Salvar alterações' : 'Criar evento'}
-      </button>
+      <div className="ui-form__actions">
+        <button className="ui-button ui-button--primary" type="submit" disabled={busy}>
+          {busy ? 'Salvando…' : editando ? 'Salvar alterações' : 'Criar evento'}
+        </button>
+        <Link className="ui-button ui-button--subtle" href={editando ? `/celebracoes/${celebration.id}` : '/agenda'}>
+          Cancelar
+        </Link>
+      </div>
     </form>
   );
 }

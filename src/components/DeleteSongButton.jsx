@@ -2,17 +2,18 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ConfirmModal } from './ConfirmModal.jsx';
+import { Icon } from './Icon.jsx';
 
 /** @param {{songId: string, title: string}} props */
 export function DeleteSongButton({ songId, title }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [confirming, setConfirming] = useState(false);
 
   const excluir = async () => {
-    if (!window.confirm(`Remover "${title}" do acervo? Essa ação não pode ser desfeita.`)) {
-      return;
-    }
+    setConfirming(false);
     setBusy(true);
     setError(null);
 
@@ -30,11 +31,26 @@ export function DeleteSongButton({ songId, title }) {
   };
 
   return (
-    <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-      <button type="button" className="btn btn--danger" disabled={busy} onClick={excluir}>
+    <>
+      <button type="button" className="ui-button ui-button--danger" disabled={busy} onClick={() => setConfirming(true)}>
+        <Icon name="delete" />
         {busy ? 'Removendo…' : 'Remover do acervo'}
       </button>
-      {error && <p className="error">{error}</p>}
-    </span>
+      {error && (
+        <p className="ui-error" role="alert">
+          {error}
+        </p>
+      )}
+      {confirming && (
+        <ConfirmModal
+          title={`Remover "${title}" do acervo?`}
+          confirmLabel="Remover do acervo"
+          onConfirm={excluir}
+          onCancel={() => setConfirming(false)}
+        >
+          Essa ação não pode ser desfeita.
+        </ConfirmModal>
+      )}
+    </>
   );
 }

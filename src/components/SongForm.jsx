@@ -5,14 +5,16 @@
  * a cifra renderizada em tempo real.
  */
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ChordProEditor } from './ChordProEditor.jsx';
+import { TagInput } from './TagInput.jsx';
 import { LITURGICAL_MOMENTS } from '@/domain/liturgy/moments.js';
 import { LITURGICAL_SEASONS } from '@/domain/liturgy/seasons.js';
 import { extractKey } from '@/domain/chordpro/parse.js';
 
-/** @param {{song?: object}} props */
-export function SongForm({ song = null }) {
+/** @param {{song?: object, tagSuggestions?: string[]}} props */
+export function SongForm({ song = null, tagSuggestions = [] }) {
   const router = useRouter();
   const editando = Boolean(song);
 
@@ -24,6 +26,7 @@ export function SongForm({ song = null }) {
     audioUrl: song?.audioUrl ?? '',
     moments: song?.moments ?? [],
     seasons: song?.seasons ?? [],
+    tags: song?.tags ?? [],
   });
   const [errors, setErrors] = useState({});
   const [message, setMessage] = useState(null);
@@ -101,76 +104,84 @@ export function SongForm({ song = null }) {
   };
 
   return (
-    <form onSubmit={submit} noValidate>
+    <form className="ui-form" onSubmit={submit} noValidate>
       {!editando && (
-        <div className="card" style={{ marginBottom: '1rem' }}>
-          <label className="field">
-            <span>Importar do CifraClub (opcional)</span>
-            <div className="row">
-              <input
-                type="url"
-                value={importUrl}
-                onChange={(event) => setImportUrl(event.target.value)}
-                placeholder="https://www.cifraclub.com.br/..."
-                style={{ flex: 1 }}
-              />
-              <button className="btn" type="button" onClick={importFromCifraClub} disabled={importing || !importUrl}>
-                {importing ? 'Importando…' : 'Importar'}
-              </button>
-            </div>
-          </label>
-          {importError && <p className="error">{importError}</p>}
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-soft)' }}>
-            Preenche o título, o tom e a cifra abaixo a partir da página — revise antes de salvar.
+        <section className="ui-card ui-form__section">
+          <h2 className="ui-heading-small">Importar do CifraClub</h2>
+          <p className="ui-helper">
+            Opcional. Preenche título, tom e cifra a partir da página; revise antes de salvar.
           </p>
-        </div>
+          <div className="ui-input-row">
+            <input
+              type="url"
+              aria-label="Endereço da cifra no CifraClub"
+              value={importUrl}
+              onChange={(event) => setImportUrl(event.target.value)}
+              placeholder="https://www.cifraclub.com.br/..."
+            />
+            <button
+              className="ui-button"
+              type="button"
+              onClick={importFromCifraClub}
+              disabled={importing || !importUrl}
+            >
+              {importing ? 'Importando…' : 'Importar'}
+            </button>
+          </div>
+          {importError && <p className="ui-error">{importError}</p>}
+        </section>
       )}
 
-      <div className="card" style={{ marginBottom: '1rem' }}>
+      <section className="ui-card ui-form__section">
+        <h2 className="ui-heading-small">Informações</h2>
         <div className="grid-2">
-          <label className="field">
-            <span>Título</span>
-            <input required value={form.title} onChange={update('title')} />
-            {errors.title && <p className="error">{errors.title}</p>}
+          <label className="ui-field">
+            <span>
+              Título <em aria-hidden="true">*</em>
+            </span>
+            <input required value={form.title} onChange={update('title')} aria-invalid={Boolean(errors.title)} />
+            {errors.title && <p className="ui-error">{errors.title}</p>}
           </label>
 
-          <label className="field">
-            <span>Autor ou fonte (opcional)</span>
+          <label className="ui-field">
+            <span>Autor ou fonte</span>
             <input value={form.composer} onChange={update('composer')} placeholder="Pe. Zezinho, CD da Campanha…" />
           </label>
+
+          <label className="ui-field">
+            <span>Tom original</span>
+            <input
+              value={form.originalKey}
+              onChange={update('originalKey')}
+              aria-invalid={Boolean(errors.originalKey)}
+              placeholder={detectado ? `${detectado} (detectado)` : 'G'}
+            />
+            {errors.originalKey && <p className="ui-error">{errors.originalKey}</p>}
+          </label>
+
+          <label className="ui-field">
+            <span>Link para ouvir</span>
+            <input
+              type="url"
+              value={form.audioUrl}
+              onChange={update('audioUrl')}
+              aria-invalid={Boolean(errors.audioUrl)}
+              placeholder="https://youtube.com/..."
+            />
+            {errors.audioUrl && <p className="ui-error">{errors.audioUrl}</p>}
+          </label>
         </div>
+      </section>
 
-        <label className="field" style={{ maxWidth: '12rem' }}>
-          <span>Tom original</span>
-          <input
-            value={form.originalKey}
-            onChange={update('originalKey')}
-            placeholder={detectado ? `${detectado} (detectado)` : 'G'}
-          />
-          {errors.originalKey && <p className="error">{errors.originalKey}</p>}
-        </label>
-
-        <label className="field">
-          <span>Link para ouvir (opcional)</span>
-          <input
-            type="url"
-            value={form.audioUrl}
-            onChange={update('audioUrl')}
-            placeholder="https://youtube.com/..."
-          />
-          {errors.audioUrl && <p className="error">{errors.audioUrl}</p>}
-        </label>
-
-        <fieldset style={{ border: 0, padding: 0, margin: '0 0 0.8rem' }}>
-          <legend style={{ fontSize: '0.85rem', fontWeight: 600, padding: 0 }}>
-            Momentos do rito em que serve
-          </legend>
-          <div className="row">
+      <section className="ui-card ui-form__section">
+        <h2 className="ui-heading-small">Adequação litúrgica</h2>
+        <fieldset className="ui-fieldset">
+          <legend>Momentos do rito em que serve</legend>
+          <div className="ui-checkbox-grid">
             {LITURGICAL_MOMENTS.map((moment) => (
-              <label key={moment.id} className="tag tag--choice" style={{ cursor: 'pointer' }}>
+              <label key={moment.id} className="ui-checkbox">
                 <input
                   type="checkbox"
-                  style={{ width: '1.1rem', height: '1.1rem', minHeight: 0, marginRight: '0.4rem' }}
                   checked={form.moments.includes(moment.id)}
                   onChange={() => toggle('moments', moment.id)}
                 />
@@ -180,16 +191,16 @@ export function SongForm({ song = null }) {
           </div>
         </fieldset>
 
-        <fieldset style={{ border: 0, padding: 0 }}>
-          <legend style={{ fontSize: '0.85rem', fontWeight: 600, padding: 0 }}>
-            Tempos litúrgicos (em branco = serve em qualquer tempo)
-          </legend>
-          <div className="row">
+        <fieldset className="ui-fieldset">
+          <legend>Tempos litúrgicos</legend>
+          <p className="ui-helper">
+            Sem nenhum marcado, a música só aparece quando o filtro de tempo do Acervo está em Todos.
+          </p>
+          <div className="ui-checkbox-grid">
             {LITURGICAL_SEASONS.map((season) => (
-              <label key={season.id} className="tag tag--choice" style={{ cursor: 'pointer' }}>
+              <label key={season.id} className="ui-checkbox">
                 <input
                   type="checkbox"
-                  style={{ width: '1.1rem', height: '1.1rem', minHeight: 0, marginRight: '0.4rem' }}
                   checked={form.seasons.includes(season.id)}
                   onChange={() => toggle('seasons', season.id)}
                 />
@@ -198,19 +209,39 @@ export function SongForm({ song = null }) {
             ))}
           </div>
         </fieldset>
-      </div>
+      </section>
+
+      <section className="ui-card ui-form__section">
+        <h2 className="ui-heading-small">Tags</h2>
+        <p className="ui-helper">
+          Facilitam a busca, como #novenasaofrancisco. Aperte Enter para acrescentar cada uma.
+        </p>
+        <TagInput
+          value={form.tags}
+          suggestions={tagSuggestions}
+          onChange={(tags) => setForm((current) => ({ ...current, tags }))}
+          error={errors.tags}
+        />
+      </section>
 
       <ChordProEditor
         value={form.chordPro}
         onChange={(value) => setForm((current) => ({ ...current, chordPro: value }))}
       />
-      {errors.chordPro && <p className="error">{errors.chordPro}</p>}
-      {message && <p className="error">{message}</p>}
+      {errors.chordPro && <p className="ui-error">{errors.chordPro}</p>}
+      {message && (
+        <p className="ui-error" role="alert">
+          {message}
+        </p>
+      )}
 
-      <div className="row" style={{ marginTop: '1rem' }}>
-        <button className="btn" type="submit" disabled={busy}>
+      <div className="ui-form__actions">
+        <button className="ui-button ui-button--primary" type="submit" disabled={busy}>
           {busy ? 'Salvando…' : editando ? 'Salvar alterações' : 'Cadastrar música'}
         </button>
+        <Link className="ui-button ui-button--subtle" href={editando ? `/acervo/${song.id}` : '/acervo'}>
+          Cancelar
+        </Link>
       </div>
     </form>
   );

@@ -12,7 +12,7 @@ describe('registerSchema', () => {
     name: 'Maria Coral',
     email: 'maria@paroquia.org',
     password: 'salmo23aleluia',
-    voiceOrInstrument: 'Soprano',
+    instruments: ['Soprano'],
     inviteToken: 'token-do-convite',
   };
 
@@ -34,7 +34,9 @@ describe('registerSchema', () => {
   });
 
   it('exige voz ou instrumento', () => {
-    expect(registerSchema.safeParse({ ...valid, voiceOrInstrument: '' }).success).toBe(false);
+    expect(registerSchema.safeParse({ ...valid, instruments: [''] }).success).toBe(false);
+    expect(registerSchema.parse({ ...valid, instruments: undefined }).instruments).toEqual([]);
+    expect(registerSchema.parse({ ...valid, instruments: ['Violão', ' violão '] }).instruments).toHaveLength(1);
   });
 
   it('exige o token do convite', () => {

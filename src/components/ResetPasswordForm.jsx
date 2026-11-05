@@ -59,21 +59,28 @@ export function ResetPasswordForm({ token }) {
   };
 
   return (
-    <form onSubmit={submit} noValidate>
-      <label className="field">
-        <span>Nova senha (mínimo 8 caracteres)</span>
-        <input
-          type="password"
-          name="password"
-          autoComplete="new-password"
-          required
-          autoFocus
-          value={form.password}
-          onChange={update('password')}
-        />
-        {errors.password && <p className="error">{errors.password}</p>}
-      </label>
-      <label className="field">
+    <form className="ui-form ui-stack ui-auth__form" onSubmit={submit} noValidate>
+      <div>
+        <label className="ui-field">
+          <span>Nova senha</span>
+          <input
+            type="password"
+            name="password"
+            autoComplete="new-password"
+            required
+            autoFocus
+            value={form.password}
+            onChange={update('password')}
+            aria-invalid={Boolean(errors.password)}
+            aria-describedby="nova-senha-ajuda"
+          />
+        </label>
+        <p className="ui-helper" id="nova-senha-ajuda">
+          Mínimo de 8 caracteres.
+        </p>
+        {errors.password && <p className="ui-error">{errors.password}</p>}
+      </div>
+      <label className="ui-field">
         <span>Repita a nova senha</span>
         <input
           type="password"
@@ -82,15 +89,24 @@ export function ResetPasswordForm({ token }) {
           required
           value={form.confirmacao}
           onChange={update('confirmacao')}
+          aria-invalid={Boolean(errors.confirmacao)}
         />
-        {errors.confirmacao && <p className="error">{errors.confirmacao}</p>}
+        {errors.confirmacao && <p className="ui-error">{errors.confirmacao}</p>}
       </label>
-      {errors.token && <p className="error">{errors.token}</p>}
-      {message && <p className="error">{message}</p>}
-      <button className="btn" type="submit" disabled={busy || !form.password || !form.confirmacao}>
+      {errors.token && <p className="ui-error">{errors.token}</p>}
+      {message && (
+        <p className="ui-error" role="alert">
+          {message}
+        </p>
+      )}
+      <button
+        className="ui-button ui-button--primary"
+        type="submit"
+        disabled={busy || !form.password || !form.confirmacao}
+      >
         {busy ? 'Salvando…' : 'Salvar nova senha'}
       </button>
-      <p style={{ fontSize: '0.9rem', marginTop: '1rem' }}>
+      <p className="ui-auth__link">
         <Link href="/entrar">Voltar para o login</Link>
       </p>
     </form>

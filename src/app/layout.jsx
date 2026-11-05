@@ -1,9 +1,12 @@
 import './globals.css';
+import './atlassian.css';
+import { cookies } from 'next/headers';
 import Link from 'next/link';
-import { currentUser } from '@/lib/session.js';
-import { roleLabel, isAdministrator } from '@/domain/auth/roles.js';
 import Image from 'next/image';
-import { HeaderContent } from '@/components/HeaderContent.jsx';
+import { currentUser } from '@/lib/session.js';
+import { actorLabel, isOwner } from '@/domain/auth/roles.js';
+import { AppNavigation } from '@/components/AppNavigation.jsx';
+import { Icon } from '@/components/Icon.jsx';
 import { signOutAction } from './actions.js';
 
 export const metadata = {
@@ -14,41 +17,45 @@ export const metadata = {
 export const viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: '#6b2d5b',
+  themeColor: '#ffffff',
 };
 
 export default async function RootLayout({ children }) {
   const user = await currentUser();
+  const navCollapsed = (await cookies()).get('nav-recolhida')?.value === '1';
 
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" data-nav={navCollapsed ? 'collapsed' : 'expanded'}>
       <body>
-        <div className="shell">
-          <header className="topbar">
-            <div className="topbar-inner">
-              <Link href="/" className="brand">
-                <Image
-                  src="/sfx.png"
-                  alt="logo"
-                  width={36}
-                  height={36}
-                  className="brand-logo"
-                  style={{ objectFit: 'contain' }}
-                />
-                <span>
-                  Santa Liturgia - São Francisco Xavier
-                  <span className="brand-sub">"Ide pelo mundo e anunciai o evangelho a toda criatura"</span>
-                </span>
-              </Link>
+        <div className={user ? 'ui-shell ui-shell--nav' : 'ui-shell'}>
+          <header className="ui-top-nav">
+            <Link href="/" className="ui-brand">
+              <Image src="/sfx.png" alt="" width={28} height={28} style={{ objectFit: 'contain' }} />
+              <span className="ui-brand__text">
+                Santa Liturgia
+                <span className="ui-brand__sub">São Francisco Xavier</span>
+              </span>
+            </Link>
 
-              <HeaderContent
-                user={user}
-                signOutAction={signOutAction}
-                isAdmin={user ? isAdministrator(user) : false}
-                roleLabel={user ? roleLabel(user.role) : null}
-              />
-            </div>
+            {user && (
+              <div className="ui-account">
+                <span className="ui-avatar" aria-hidden="true">
+                  {user.name.trim().charAt(0).toUpperCase()}
+                </span>
+                <span className="ui-account__text">
+                  {user.name}
+                  <small>{actorLabel(user)}</small>
+                </span>
+                <form action={signOutAction}>
+                  <button type="submit" className="ui-button ui-button--icon" aria-label="Sair" title="Sair">
+                    <Icon name="log-out" />
+                  </button>
+                </form>
+              </div>
+            )}
           </header>
+
+          {user && <AppNavigation isOwner={isOwner(user)} collapsed={navCollapsed} />}
 
           <main className="main">{children}</main>
 

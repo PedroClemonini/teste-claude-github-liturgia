@@ -1,67 +1,55 @@
 import { redirect } from 'next/navigation';
 import { currentUser } from '@/lib/session.js';
-import { listMembers } from '@/services/users.js';
+import { listMembers, toMemberRow } from '@/services/users.js';
 import { listManagedCapelas } from '@/services/capelas.js';
-import { isAdministrator, isCoordinator } from '@/domain/auth/roles.js';
+import { canManageCapela, isCoordinator } from '@/domain/auth/roles.js';
+import { capelaOptions, membersOf, pickCapela } from '@/domain/team/capela-selection.js';
 import { MemberList } from '@/components/MemberList.jsx';
-import { CapelaManagerPanel } from '@/components/CapelaManagerPanel.jsx';
+import { CapelaToolbar } from '@/components/CapelaToolbar.jsx';
 
 export const metadata = { title: 'Equipe · Coral Litúrgico' };
 
 export default async function EquipePage({ searchParams }) {
   const user = await currentUser();
   if (!user) redirect('/entrar');
-  if (isAdministrator(user)) redirect('/admin');
 
   const query = await searchParams;
-  const filtroCapela = query?.capela ?? '';
+  const [todos, capelas] = await Promise.all([
+    listMembers(user),
+    isCoordinator(user) ? listManagedCapelas(user) : [],
+  ]);
 
-  const todos = await listMembers(user);
-  const capelas = isCoordinator(user) ? await listManagedCapelas(user) : [];
-
-  // Opções do filtro: todas as capelas que aparecem entre os integrantes visíveis.
-  const opcoesCapela = [
-    ...new Map(
-      todos
-        .filter((member) => member.capelaId && member.capela?.name)
-        .map((member) => [member.capelaId, member.capela.name]),
-    ),
-  ].sort((a, b) => a[1].localeCompare(b[1]));
-
-  const members = filtroCapela ? todos.filter((member) => member.capelaId === filtroCapela) : todos;
+  const options = capelaOptions(todos, capelas);
+  // Abre onde a pessoa pode agir: as capelas que coordena vêm primeiro.
+  const preferred = [...capelas.map((capela) => capela.id), ...user.capelaIds];
+  const selected = pickCapela(options, query?.capela, preferred);
+  const members = membersOf(todos, selected);
+  const canManage = selected !== null && canManageCapela(user, { id: selected });
 
   return (
     <>
-      <div className="page-head">
-        <div className="grow">
-          <h1>Equipe</h1>
-          <p>
+      <div className="ui-page-head">
+        <div>
+          <h1 className="ui-heading-large">Equipe</h1>
+          <p className="ui-subtle">
             {members.length} {members.length === 1 ? 'integrante' : 'integrantes'}
-            {isCoordinator(user)
-              ? ' — você gerencia e convida só a sua capela.'
-              : ' na sua capela.'}
+            {selected && !canManage && isCoordinator(user) ? ' — você só consulta esta capela.' : ''}
           </p>
         </div>
       </div>
 
-      {isCoordinator(user) && <CapelaManagerPanel capelas={capelas} />}
+      <CapelaToolbar options={options} selected={selected} basePath="/equipe" canManage={canManage} />
 
-      <MemberList
-        members={members.map((member) => ({
-          id: member.id,
-          name: member.name,
-          email: member.email,
-          voiceOrInstrument: member.voiceOrInstrument,
-          role: member.role,
-          capelaName: member.capela?.name ?? null,
-          editable: member.capelaId === user.capelaId,
-        }))}
-        canManage={isCoordinator(user)}
-        currentUserId={user.id}
-        filterOptions={opcoesCapela.map(([id, name]) => ({ id, name }))}
-        activeFilter={filtroCapela}
-        filterAction="/equipe"
-      />
+      {selected ? (
+        <MemberList
+          members={members.map(toMemberRow)}
+          capelaId={selected}
+          currentUserId={user.id}
+          canManage={canManage}
+        />
+      ) : (
+        <p className="ui-subtle">Você ainda não faz parte de nenhuma capela.</p>
+      )}
     </>
   );
 }

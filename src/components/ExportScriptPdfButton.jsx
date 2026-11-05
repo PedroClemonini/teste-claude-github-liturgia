@@ -21,7 +21,7 @@ export function ExportScriptPdfButton() {
   };
 
   return (
-    <button type="button" className="btn btn--ghost" onClick={exportar}>
+    <button type="button" className="ui-button" onClick={exportar}>
       Exportar cifras (PDF)
     </button>
   );

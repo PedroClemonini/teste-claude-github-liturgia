@@ -5,6 +5,7 @@
 
 export const LITURGICAL_MOMENTS = [
   { id: 'ENTRADA', label: 'Entrada' },
+  { id: 'HINOS', label: 'Hinos' },
   { id: 'ATO_PENITENCIAL', label: 'Ato Penitencial' },
   { id: 'GLORIA', label: 'Glória' },
   { id: 'SALMO', label: 'Salmo' },
@@ -13,8 +14,6 @@ export const LITURGICAL_MOMENTS = [
   { id: 'OFERTORIO', label: 'Ofertório' },
   { id: 'SANTO', label: 'Santo' },
   { id: 'ORACAO_EUCARISTICA', label: 'Oração Eucarística' },
-  { id: 'MISTERIO_DA_FE', label: 'Mistério da Fé' },
-  { id: 'GRANDE_AMEM', label: 'Grande Amém' },
   { id: 'CORDEIRO', label: 'Cordeiro' },
   { id: 'COMUNHAO', label: 'Comunhão' },
   { id: 'ACAO_DE_GRACAS', label: 'Ação de Graças' },

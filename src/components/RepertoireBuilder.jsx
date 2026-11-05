@@ -5,8 +5,25 @@
  * escolhida do acervo e o tom em que ela será executada nesta evento.
  */
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { LITURGICAL_MOMENTS } from '@/domain/liturgy/moments.js';
+import { Select } from './Select.jsx';
+
+/** Sem canto primeiro; depois as indicadas para o momento e o resto do acervo. */
+function songOptions(songs, moment) {
+  const toOption = (group) => (song) => ({
+    value: song.id,
+    label: `${song.title} (${song.originalKey})`,
+    group,
+    keywords: (song.tags ?? []).join(' '),
+  });
+  return [
+    { value: '', label: 'Sem canto' },
+    ...songs.filter((song) => song.moments?.includes(moment.id)).map(toOption(`Indicadas para ${moment.label}`)),
+    ...songs.filter((song) => !song.moments?.includes(moment.id)).map(toOption('Demais músicas do acervo')),
+  ];
+}
 
 /**
  * @param {{
@@ -73,46 +90,34 @@ export function RepertoireBuilder({ celebrationId, songs, initial }) {
   };
 
   return (
-    <div className="card">
-      <p style={{ marginTop: 0, color: 'var(--text-soft)', fontSize: '0.88rem' }}>
-        Escolha a música de cada momento. Deixe em branco os momentos que não terão canto.
-        O tom em branco usa o tom original da cifra.
+    <div className="ui-form">
+      <p className="ui-subtle ui-repertoire__hint">
+        Escolha a música de cada momento. Deixe sem canto os momentos que não terão música. Tom em
+        branco usa o tom original da cifra.
       </p>
+
+      <div className="moment-head" aria-hidden="true">
+        <span>Momento</span>
+        <span>Música</span>
+        <span>Tom</span>
+      </div>
 
       {LITURGICAL_MOMENTS.map((moment) => {
         const row = rows[moment.id];
         const song = songById.get(row.songId);
-        // Sugere primeiro as músicas marcadas para este momento do rito.
-        const sugeridas = songs.filter((item) => item.moments?.includes(moment.id));
-        const restantes = songs.filter((item) => !item.moments?.includes(moment.id));
 
         return (
           <div className="moment-row" key={moment.id}>
             <span className="moment-row-label">{moment.label}</span>
 
-            <select
-              aria-label={`Música para ${moment.label}`}
+            <Select
+              compact
+              searchable
+              label={`Música para ${moment.label}`}
               value={row.songId}
-              onChange={(event) => update(moment.id, { songId: event.target.value })}
-            >
-              <option value="">— sem canto —</option>
-              {sugeridas.length > 0 && (
-                <optgroup label={`Indicadas para ${moment.label}`}>
-                  {sugeridas.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.title} ({item.originalKey})
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-              <optgroup label="Demais músicas do acervo">
-                {restantes.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.title} ({item.originalKey})
-                  </option>
-                ))}
-              </optgroup>
-            </select>
+              options={songOptions(songs, moment)}
+              onChange={(songId) => update(moment.id, { songId, keyOverride: songId ? row.keyOverride : '' })}
+            />
 
             <input
               aria-label={`Tom para ${moment.label}`}
@@ -125,18 +130,25 @@ export function RepertoireBuilder({ celebrationId, songs, initial }) {
         );
       })}
 
-      {error && <p className="error">{error}</p>}
+      {error && (
+        <p className="ui-error" role="alert">
+          {error}
+        </p>
+      )}
       {message && (
-        <p style={{ color: 'var(--ok)', fontSize: '0.9rem' }} role="status">
+        <p className="ui-success" role="status">
           {message}
         </p>
       )}
 
-      <div className="row" style={{ marginTop: '1rem' }}>
-        <button className="btn" type="button" onClick={salvar} disabled={busy}>
+      <div className="ui-form__actions ui-repertoire__actions">
+        <button className="ui-button ui-button--primary" type="button" onClick={salvar} disabled={busy}>
           {busy ? 'Salvando…' : 'Salvar roteiro'}
         </button>
-        <span style={{ fontSize: '0.85rem', color: 'var(--text-soft)' }}>
+        <Link className="ui-button ui-button--subtle" href={`/celebracoes/${celebrationId}`}>
+          Voltar ao evento
+        </Link>
+        <span className="ui-subtle">
           {escolhidos} {escolhidos === 1 ? 'canto escolhido' : 'cantos escolhidos'}
         </span>
       </div>
