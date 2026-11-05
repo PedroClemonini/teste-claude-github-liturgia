@@ -39,6 +39,8 @@ export default async function PerfilPage() {
           </ul>
         )}
       </section>
+
+      <p className="ui-credits">Feito para servir à liturgia — cifras em ChordPro, sem PDF.</p>
     </>
   );
 }

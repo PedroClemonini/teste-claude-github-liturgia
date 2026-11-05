@@ -144,6 +144,11 @@ textarea {
   justify-content: flex-end;
 }
 
+.pair-chord--float {
+  width: 0;
+  overflow: visible;
+}
+
 .pair-chord {
   font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   font-size: 0.85em;
@@ -156,6 +161,11 @@ textarea {
 
 .pair-lyric {
   white-space: pre-wrap;
+}
+
+/* Acorde sem letra embaixo (introdução) fica na mesma altura dos outros. */
+.pair-lyric:empty::before {
+  content: '\200b';
 }
 
 .sheet--lyrics-only .sheet-line {

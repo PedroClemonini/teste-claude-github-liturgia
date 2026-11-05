@@ -25,11 +25,12 @@ const COLUMNS_STORAGE_KEY = 'cifra-colunas';
  *     performanceKey?: string|null,
  *   }>,
  *   label?: string,
+ *   iconOnly?: boolean,
  *   offset?: number,
  *   onOffsetChange?: (offset: number) => void,
  * }} props
  */
-export function PerformanceMode({ songs, label = 'Modo missa', offset, onOffsetChange }) {
+export function PerformanceMode({ songs, label = 'Modo missa', iconOnly = false, offset, onOffsetChange }) {
   const [active, setActive] = useState(false);
   const [index, setIndex] = useState(0);
   const [columns, setColumns] = useState(1);
@@ -134,9 +135,15 @@ export function PerformanceMode({ songs, label = 'Modo missa', offset, onOffsetC
 
   return (
     <>
-      <button type="button" className="ui-button" onClick={open}>
+      <button
+        type="button"
+        className={iconOnly ? 'ui-button ui-button--subtle ui-button--icon' : 'ui-button'}
+        aria-label={label}
+        title={label}
+        onClick={open}
+      >
         <Icon name="fullscreen-enter" />
-        {label}
+        {!iconOnly && label}
       </button>
 
       {active && (

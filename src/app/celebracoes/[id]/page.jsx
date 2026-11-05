@@ -14,7 +14,7 @@ import { PerformanceMode } from '@/components/PerformanceMode.jsx';
 import { Breadcrumbs } from '@/components/Breadcrumbs.jsx';
 import { LiturgyChoicePicker } from '@/components/LiturgyChoicePicker.jsx';
 import { LiturgyPanel } from '@/components/LiturgyPanel.jsx';
-import { isSaturdayMass, liturgyChoiceFor, liturgyDateFor } from '@/domain/liturgy/daily.js';
+import { displaySeason, isSaturdayMass, liturgyChoiceFor, liturgyDateFor } from '@/domain/liturgy/daily.js';
 import { getLiturgy } from '@/services/liturgy.js';
 import { Icon } from '@/components/Icon.jsx';
 
@@ -84,8 +84,8 @@ export default async function CelebracaoPage({ params }) {
             {celebrationTypeLabel(celebration.type)}
           </span>
           <span className="ui-lozenge">
-            <span className="season-dot" data-season={celebration.season} />
-            {seasonLabel(celebration.season)}
+            <span className="season-dot" data-season={displaySeason(celebration)} />
+            {seasonLabel(displaySeason(celebration))}
           </span>
           <span className="ui-lozenge">{celebration.capela.name}</span>
         </div>

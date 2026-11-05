@@ -6,10 +6,11 @@
  * Cada par acorde+sílaba vira um único bloco inline: o acorde fica na linha de
  * cima e a sílaba na de baixo, dentro do mesmo elemento. Assim, quando a linha
  * quebra no celular, acorde e sílaba quebram juntos — o acorde nunca escorrega
- * para outra sílaba.
+ * para outra sílaba. O acorde flutua sobre a letra, sem alargá-la, salvo quando
+ * encostaria no seguinte (veja `floatingChords`).
  */
 import { useMemo } from 'react';
-import { groupIntoWords, parseChordPro } from '@/domain/chordpro/parse.js';
+import { floatingChords, groupIntoWords, parseChordPro } from '@/domain/chordpro/parse.js';
 import { transposeChord } from '@/domain/chordpro/transpose.js';
 
 /**
@@ -63,13 +64,16 @@ export function ChordSheet({
           return <div className="sheet-section-end" key={index} aria-hidden="true" />;
         }
 
+        const words = groupIntoWords(line.pairs);
+        const floating = floatingChords(words, renderChord);
+
         return (
           <p
             className={`sheet-line ${line.chorus ? 'sheet-line--chorus' : ''}`}
             data-chorus={line.chorus ? 'true' : undefined}
             key={index}
           >
-            {groupIntoWords(line.pairs).map((word, wordIndex) => (
+            {words.map((word, wordIndex) => (
               /* A palavra é o bloco que não quebra: dentro dela, cada acorde
                  fica empilhado sobre a sua própria sílaba. */
               <span className="word" data-testid="word" key={wordIndex}>
@@ -77,7 +81,9 @@ export function ChordSheet({
                   <span className="pair" data-testid="pair" key={segmentIndex}>
                     {showChords && (
                       <span
-                        className="pair-chord"
+                        className={`pair-chord ${
+                          floating.has(`${wordIndex}:${segmentIndex}`) ? 'pair-chord--float' : ''
+                        }`}
                         data-testid={segment.chord ? 'chord' : undefined}
                       >
                         {renderChord(segment.chord)}

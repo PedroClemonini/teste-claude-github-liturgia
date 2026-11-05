@@ -9,7 +9,6 @@ import { getVideoEmbedUrl } from '@/domain/video/embed.js';
 import { formatTag } from '@/domain/songs/tags.js';
 import { SongWithFullscreen } from '@/components/SongWithFullscreen.jsx';
 import { DeleteSongButton } from '@/components/DeleteSongButton.jsx';
-import { Breadcrumbs } from '@/components/Breadcrumbs.jsx';
 import { Icon } from '@/components/Icon.jsx';
 
 export const metadata = { title: 'Cifra · Coral Litúrgico' };
@@ -39,13 +38,38 @@ export default async function MusicaPage({ params }) {
           originalKey: song.originalKey,
           chordPro: song.chordPro,
         }}
-        breadcrumbs={<Breadcrumbs items={[{ href: '/acervo', label: 'Acervo' }, { label: song.title }]} />}
+        meta={
+          (song.moments.length > 0 || song.seasons.length > 0 || song.tags.length > 0) && (
+            <div className="ui-song-meta">
+              {song.moments.map((moment) => (
+                <span className="ui-lozenge" key={moment}>
+                  {momentLabel(moment)}
+                </span>
+              ))}
+              {song.seasons.map((season) => (
+                <span className="ui-lozenge" key={season}>
+                  <span className="season-dot" data-season={season} />
+                  {seasonLabel(season)}
+                </span>
+              ))}
+              {song.tags.map((tag) => (
+                <Link className="ui-tag" key={tag} href={`/acervo?tag=${tag}`}>
+                  {formatTag(tag)}
+                </Link>
+              ))}
+            </div>
+          )
+        }
       >
         {isCoordinator(user) && (
           <>
-            <Link className="ui-button" href={`/acervo/${song.id}/editar`}>
+            <Link
+              className="ui-button ui-button--subtle ui-button--icon"
+              href={`/acervo/${song.id}/editar`}
+              aria-label="Editar"
+              title="Editar"
+            >
               <Icon name="edit" />
-              Editar
             </Link>
             <DeleteSongButton songId={song.id} title={song.title} />
           </>
@@ -72,47 +96,6 @@ export default async function MusicaPage({ params }) {
         )
       )}
 
-      {(song.moments.length > 0 || song.seasons.length > 0 || song.tags.length > 0) && (
-        <dl className="ui-details">
-          {song.moments.length > 0 && (
-            <div>
-              <dt>Momentos do rito</dt>
-              <dd>
-                {song.moments.map((moment) => (
-                  <span className="ui-lozenge" key={moment}>
-                    {momentLabel(moment)}
-                  </span>
-                ))}
-              </dd>
-            </div>
-          )}
-          {song.seasons.length > 0 && (
-            <div>
-              <dt>Tempos litúrgicos</dt>
-              <dd>
-                {song.seasons.map((season) => (
-                  <span className="ui-lozenge" key={season}>
-                    <span className="season-dot" data-season={season} />
-                    {seasonLabel(season)}
-                  </span>
-                ))}
-              </dd>
-            </div>
-          )}
-          {song.tags.length > 0 && (
-            <div>
-              <dt>Tags</dt>
-              <dd>
-                {song.tags.map((tag) => (
-                  <Link className="ui-tag" key={tag} href={`/acervo?tag=${tag}`}>
-                    {formatTag(tag)}
-                  </Link>
-                ))}
-              </dd>
-            </div>
-          )}
-        </dl>
-      )}
     </>
   );
 }

@@ -7,9 +7,12 @@
  * acorde nunca escorregue para outra sílaba, qualquer que seja a largura da
  * tela.
  */
-import { parseChord } from './chord.js';
+import { isChord, parseChord } from './chord.js';
 
 /** Diretivas abreviadas aceitas pelo formato. */
+const ZERO_WIDTH = /[\u200B\uFEFF]/g;
+const SECTION_RE = /^\[([^\]]+)\]$/;
+
 const DIRECTIVE_ALIASES = {
   t: 'title',
   st: 'subtitle',
@@ -77,7 +80,8 @@ export function parseChordPro(text) {
   let inChorus = false;
 
   for (const rawLine of text.split(/\r?\n/)) {
-    const line = rawLine.trimEnd();
+    // Sites de cifra deixam espaços de largura zero no início das linhas.
+    const line = rawLine.replace(ZERO_WIDTH, '').trimEnd();
 
     if (line.trim() === '') {
       result.lines.push({ type: 'empty' });
@@ -104,6 +108,13 @@ export function parseChordPro(text) {
       } else {
         result.meta[name] = value;
       }
+      continue;
+    }
+
+    // [Primeira Parte], sozinho na linha, é título de seção, não acorde.
+    const section = SECTION_RE.exec(line.trim());
+    if (section && !isChord(section[1])) {
+      result.lines.push({ type: 'comment', text: section[1] });
       continue;
     }
 
@@ -183,4 +194,31 @@ export function groupIntoWords(pairs) {
   }
 
   return words;
+}
+
+/**
+ * Quais acordes flutuam sobre a letra, sem alargá-la. Por padrão o bloco teria
+ * a largura do maior entre acorde e sílaba: em "te[F#]u povo" isso abre um
+ * buraco no meio da frase. O acorde só reserva espaço quando encostaria no
+ * seguinte: ele ocupa cerca de um caractere de letra por caractere do acorde,
+ * mais um de folga.
+ *
+ * @param {Array<{segments: Array<{chord: string|null, text: string}>}>} words
+ * @param {(chord: string) => string} [render] acorde como aparece na tela
+ * @returns {Set<string>} chaves "palavra:segmento" dos acordes que flutuam
+ */
+export function floatingChords(words, render = (chord) => chord) {
+  const segments = words.flatMap((word, wordIndex) =>
+    word.segments.map((segment, segmentIndex) => ({ ...segment, key: `${wordIndex}:${segmentIndex}` })),
+  );
+
+  const floating = new Set();
+  segments.forEach((segment, index) => {
+    if (!segment.chord || !segment.text) return;
+
+    const next = segments.findIndex((other, otherIndex) => otherIndex > index && other.chord);
+    const room = (next < 0 ? [] : segments.slice(index, next)).reduce((total, item) => total + item.text.length, 0);
+    if (next < 0 || room >= render(segment.chord).length + 1) floating.add(segment.key);
+  });
+  return floating;
 }

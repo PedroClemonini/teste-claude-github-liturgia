@@ -5,7 +5,7 @@
  * formato mudar, o dia conta como indisponível em vez de quebrar a tela.
  */
 import { z } from 'zod';
-import { seasonColor } from './seasons.js';
+import { seasonColor, seasonForDate } from './seasons.js';
 
 const BRAZIL_TIME_ZONE = 'America/Sao_Paulo';
 
@@ -125,6 +125,16 @@ export function liturgyChoiceFor(celebration) {
 export function liturgyDateFor(celebration) {
   const iso = dateToIso(new Date(celebration.date));
   return liturgyChoiceFor(celebration) === 'DOMINGO' ? addDaysIso(iso, 1) : iso;
+}
+
+/**
+ * Tempo litúrgico a mostrar: na vigília vale o do domingo, senão a missa de
+ * 28/11 às 19h apareceria como Tempo Comum com a liturgia do Advento.
+ */
+export function displaySeason(celebration) {
+  return liturgyChoiceFor(celebration) === 'DOMINGO'
+    ? seasonForDate(liturgyDateFor(celebration))
+    : celebration.season;
 }
 
 /** A celebração principal primeiro; as demais são opções do celebrante. */

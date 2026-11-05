@@ -6,6 +6,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { ChordSheet } from './ChordSheet.jsx';
+import { Icon } from './Icon.jsx';
 import {
   keyPrefersFlats,
   semitonesBetween,
@@ -71,6 +72,10 @@ export function SongViewer({
   }, [song.originalKey, offset]);
 
   const changed = offset !== baseOffset;
+  // O painel já mostra o tom atual: o original só importa quando é outro.
+  const meta = [song.composer, currentKey !== song.originalKey && `original: ${song.originalKey}`]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <article className="viewer">
@@ -82,17 +87,14 @@ export function SongViewer({
               <h1 className="viewer-title ui-heading-large">{song.title}</h1>
             </>
           )}
-          <p className="viewer-meta">
-            {song.composer ? `${song.composer} · ` : ''}
-            <span>tom original: {song.originalKey}</span>
-          </p>
+          {meta && <p className="viewer-meta">{meta}</p>}
         </div>
       </header>
 
-      <div className="viewer-controls" role="group" aria-label="Transposição">
+      <div className="viewer-controls" role="group" aria-label="Controles da cifra">
         <button
           type="button"
-          className="ui-button ui-button--icon"
+          className="ui-button viewer-tool"
           onClick={() => setOffset(offset - 1)}
           aria-label="Descer meio tom"
         >
@@ -104,7 +106,7 @@ export function SongViewer({
         </div>
         <button
           type="button"
-          className="ui-button ui-button--icon"
+          className="ui-button viewer-tool"
           onClick={() => setOffset(offset + 1)}
           aria-label="Subir meio tom"
         >
@@ -113,26 +115,31 @@ export function SongViewer({
 
         <button
           type="button"
-          className="ui-button ui-button--subtle"
+          className="ui-button ui-button--subtle viewer-tool"
           onClick={() => setOffset(baseOffset)}
           disabled={!changed}
           aria-label={performanceKey ? 'Voltar ao tom da evento' : 'Voltar ao tom original'}
+          title={performanceKey ? 'Voltar ao tom do evento' : 'Voltar ao tom original'}
         >
-          Voltar
+          <Icon name="retry" />
+          <span className="viewer-tool__label">Voltar</span>
         </button>
         <button
           type="button"
-          className="ui-button ui-button--subtle"
+          className="ui-button ui-button--subtle viewer-tool"
+          aria-pressed={!showChords}
           onClick={() => setShowChords((value) => !value)}
           aria-label={showChords ? 'Somente letra' : 'Mostrar cifra'}
+          title={showChords ? 'Somente letra' : 'Mostrar cifra'}
         >
-          {showChords ? 'Somente letra' : 'Mostrar cifra'}
+          <Icon name="text" />
+          <span className="viewer-tool__label">{showChords ? 'Somente letra' : 'Mostrar cifra'}</span>
         </button>
 
         <div className="viewer-font-controls" role="group" aria-label="Tamanho da letra">
           <button
             type="button"
-            className="ui-button ui-button--icon"
+            className="ui-button viewer-tool"
             onClick={() => changeFontScale(-FONT_SCALE_STEP)}
             disabled={fontScale <= FONT_SCALE_MIN}
             aria-label="Diminuir tamanho da letra"
@@ -141,7 +148,7 @@ export function SongViewer({
           </button>
           <button
             type="button"
-            className="ui-button ui-button--icon"
+            className="ui-button viewer-tool"
             onClick={() => changeFontScale(FONT_SCALE_STEP)}
             disabled={fontScale >= FONT_SCALE_MAX}
             aria-label="Aumentar tamanho da letra"
